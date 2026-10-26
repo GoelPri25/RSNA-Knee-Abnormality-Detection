@@ -1,0 +1,21 @@
+{
+  "id": "priyanjaliml/rsna-gl4-mirror-tta-submission",
+  "title": "rsna-gl4-mirror-tta-submission",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "priyanjaliml/rsna-pubkd-e4cnxs-fold0",
+    "tumis001/rsna-coatnet-d96-exp1b-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

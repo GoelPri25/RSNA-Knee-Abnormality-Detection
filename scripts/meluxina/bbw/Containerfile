@@ -1,0 +1,6 @@
+# BB-CMP pretrained weights (timm / HF hub), downloaded at build time into the image's HF cache (/opt/hf, which already
+# holds resnet50.tv_in1k); the cache is then copied out and bound over /opt/hf on MeluXina (compute nodes offline).
+FROM localhost/rsna-mlx-train:v1
+ENV HF_HUB_OFFLINE=0
+RUN python -c "import timm; [timm.create_model(n, pretrained=True, num_classes=0) for n in ('convnext_tiny.in12k_ft_in1k_384', 'coatnet_0_rw_224.sw_in1k', 'tf_efficientnetv2_s.in21k_ft_in1k', 'vit_small_patch14_reg4_dinov2.lvd142m', 'vit_small_patch16_dinov3.lvd1689m', 'resnet50.tv_in1k')]; print('ok')" && chmod -R a+rX /opt/hf
+ENV HF_HUB_OFFLINE=1
