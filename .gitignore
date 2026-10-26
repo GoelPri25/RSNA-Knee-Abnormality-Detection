@@ -1,0 +1,20 @@
+# Local data and experiment artifacts.
+# Anchored to the repository root: an unanchored `data/` also matches
+# src/rsna_knee/data/ and silently drops source files.
+/data/
+/artifacts/
+/outputs/
+/checkpoints/
+
+# Local configuration and Python caches
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+/.cache/
+*.egg-info/
+build/
+.DS_Store

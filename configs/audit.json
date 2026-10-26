@@ -1,0 +1,25 @@
+{
+  "seed": 42,
+  "sample_series": 32,
+  "dicom_suffixes": [
+    ".dcm",
+    ".dicom"
+  ],
+  "labels_csv": "train.csv",
+  "study_column": "StudyInstanceUID",
+  "target_columns": [
+    "ACL",
+    "MCL",
+    "Medial Meniscus",
+    "Lateral Meniscus",
+    "Medial OA",
+    "Lateral OA",
+    "PF OA",
+    "Effusion",
+    "Synovitis",
+    "Baker's",
+    "Contusion",
+    "Fracture"
+  ],
+  "dataset_version": "unverified"
+}

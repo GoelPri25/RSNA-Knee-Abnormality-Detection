@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      PYTHONPATH: /workspace/src
+      MPLCONFIGDIR: /tmp/matplotlib

@@ -1,0 +1,11 @@
+.git
+.env
+.venv
+data
+artifacts
+outputs
+checkpoints
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache

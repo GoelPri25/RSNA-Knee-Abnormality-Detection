@@ -1,0 +1,62 @@
+{
+  "version": "hpo_v31_d2_resnet50_fold0",
+  "cache": {
+    "field_of_view_mm": 140.0,
+    "image_size": 224,
+    "series_slots": 4,
+    "slices_per_slot": 12,
+    "central_band": [
+      0.2,
+      0.8
+    ],
+    "clip_percentiles": [
+      1.0,
+      99.0
+    ],
+    "exclude_order_sources": [
+      "unordered"
+    ]
+  },
+  "model": {
+    "backbone": "resnet50",
+    "pretrained": true,
+    "dropout": 0.4,
+    "pooling": "target_topk_mean",
+    "top_k_fraction": 0.1
+  },
+  "epochs": 60,
+  "batch_studies": 8,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.03,
+  "warmup_fraction": 0.05,
+  "gradient_clip_norm": 1.0,
+  "mixed_precision": true,
+  "validation_fold": 0,
+  "xla_eval_slices": 48,
+  "confident_low": 0.3,
+  "confident_high": 0.7,
+  "seed": 2026,
+  "note": "Same ResNet-34 reader and plateau-60 recipe as the 0.906 reference. Training uses HPO v1 blend labels; held-out report validation is scored against Steven v4. TPU/XLA uses fixed 24 training and 48 evaluation windows per study; repeated study padding is masked from the loss.",
+  "early_stopping_patience": 8,
+  "early_stopping_min_delta": 0.0005,
+  "early_stopping_metric": "auc",
+  "scheduler": {
+    "type": "reduce_on_plateau",
+    "mode": "min",
+    "factor": 0.5,
+    "patience": 2,
+    "threshold": 0.0005,
+    "threshold_mode": "abs",
+    "cooldown": 1,
+    "min_lr": 1e-06
+  },
+  "augmentation": {
+    "crop_area_min": 1.0,
+    "translate_fraction": 0.06,
+    "rotation_degrees": 0.0,
+    "intensity_jitter": 0.15,
+    "brightness_shift": 0.1,
+    "erase_probability": 0.25,
+    "erase_fraction": 0.25
+  }
+}

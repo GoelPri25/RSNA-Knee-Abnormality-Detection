@@ -1,0 +1,65 @@
+{
+  "version": "hpo_v31_d2_local_global_native_neighbors_seed2026",
+  "cache": {
+    "field_of_view_mm": 140.0,
+    "image_size": 224,
+    "series_slots": 4,
+    "slices_per_slot": 12,
+    "central_band": [
+      0.2,
+      0.8
+    ],
+    "clip_percentiles": [
+      1.0,
+      99.0
+    ],
+    "exclude_order_sources": [
+      "unordered"
+    ]
+  },
+  "model": {
+    "backbone": "resnet50",
+    "pretrained": true,
+    "dropout": 0.4,
+    "pooling": "local_topk_plus_study_context",
+    "top_k_fraction": 0.1,
+    "context_width": 256,
+    "context_heads": 4,
+    "context_layers": 1
+  },
+  "epochs": 60,
+  "batch_studies": 8,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.03,
+  "warmup_fraction": 0.05,
+  "gradient_clip_norm": 1.0,
+  "mixed_precision": true,
+  "validation_fold": 0,
+  "xla_eval_slices": 48,
+  "confident_low": 0.3,
+  "confident_high": 0.7,
+  "seed": 2026,
+  "note": "One shared ImageNet ResNet50; native adjacent triplets plus study-wide contextual residual; unchanged HPO-v3.1-D2 train and Steven-v4 validation, fold0, optimizer and controls.",
+  "early_stopping_patience": 8,
+  "early_stopping_min_delta": 0.0005,
+  "early_stopping_metric": "auc",
+  "scheduler": {
+    "type": "reduce_on_plateau",
+    "mode": "min",
+    "factor": 0.5,
+    "patience": 2,
+    "threshold": 0.0005,
+    "threshold_mode": "abs",
+    "cooldown": 1,
+    "min_lr": 1e-06
+  },
+  "augmentation": {
+    "crop_area_min": 1.0,
+    "translate_fraction": 0.06,
+    "rotation_degrees": 0.0,
+    "intensity_jitter": 0.15,
+    "brightness_shift": 0.1,
+    "erase_probability": 0.25,
+    "erase_fraction": 0.25
+  }
+}
