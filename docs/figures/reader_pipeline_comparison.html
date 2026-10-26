@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knee Reader Pipelines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; a three-lane stage grid (0.925 → 1c → 2a) is the spine, diagrams and specs below it. */
+:root {
+  --bg: #f4f6f7; --surface: #ffffff; --fg: #14212b; --muted: #566673; --line: #d5dde2;
+  --accent: #0e7383; --accent-soft: #dcf0f2; --new: #b4480f; --new-soft: #fbe8dc; --same: #8a98a3;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f171d; --surface: #16222a; --fg: #e3eaee; --muted: #9aabb7; --line: #2a3a45;
+  --accent: #4fc1cf; --accent-soft: #143a40; --new: #f59a5c; --new-soft: #3d2416; --same: #6f808c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f171d; --surface: #16222a; --fg: #e3eaee; --muted: #9aabb7; --line: #2a3a45;
+  --accent: #4fc1cf; --accent-soft: #143a40; --new: #f59a5c; --new-soft: #3d2416; --same: #6f808c; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 800; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 600 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lead { color: var(--muted); font-size: 1.08rem; }
+section { display: grid; gap: 18px; }
+.mono { font-family: var(--mono); font-size: 0.86em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* model cards */
+.models { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.model { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+.model .tag { font: 600 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.model.proposed { border-color: var(--new); }
+.model.proposed .tag { color: var(--new); }
+.scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.scores div { display: grid; gap: 2px; }
+.scores span { font: 400 0.72rem/1.2 var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.scores b { font: 700 1.25rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+
+/* stage grid */
+.legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 0.9rem; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+thead th { font: 700 0.85rem/1.3 var(--display); background: var(--bg); position: sticky; top: 0; }
+thead th small { display: block; font: 400 0.74rem/1.3 var(--mono); color: var(--muted); }
+tbody th { font: 600 0.8rem/1.35 var(--mono); color: var(--muted); width: 150px; text-transform: uppercase; letter-spacing: 0.04em; }
+tbody tr.group th { color: var(--accent); background: var(--bg); font-size: 0.72rem; padding-block: 7px; }
+tbody tr.group td { background: var(--bg); padding-block: 7px; }
+td.chg { background: var(--accent-soft); }
+td.new { background: var(--new-soft); }
+td.same { color: var(--same); }
+td b { font-weight: 600; }
+
+/* diagrams */
+.diagrams { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+figcaption { font-size: 0.9rem; color: var(--muted); }
+figure .scroll { border: 0; }
+pre.mermaid { margin: 0; background: transparent; }
+
+/* spec lists */
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.spec > div { display: grid; gap: 8px; align-content: start; min-width: 0; }
+ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 6px; }
+li { max-width: 68ch; }
+.callout { border-left: 3px solid var(--new); padding: 4px 0 4px 14px; color: var(--fg); }
+.gain { color: var(--accent); font-weight: 600; }
+.loss { color: var(--new); font-weight: 600; }
+footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">RSNA knee MRI · fold-0 research log · 2026-10-10</div>
+    <h1>Knee Reader Pipelines</h1>
+    <p class="lead">How one study becomes 12 probabilities in three readers: the original ResNet-50 recipe that scored 0.925,
+      the d96 recipe (Exp 1c) that scored 0.933 with the same backbone and labels, and the proposed Exp 2a, which keeps 1c
+      and adds context between slices.</p>
+  </header>
+
+  <section aria-labelledby="m">
+    <h2 id="m">The three readers</h2>
+    <div class="models">
+      <div class="model">
+        <div class="tag">Original recipe</div>
+        <h3>r50 HPO-v3.1-D2 224</h3>
+        <div class="scores num">
+          <div><span>Fold 0</span><b>0.8963</b></div><div><span>Public LB</span><b>0.925</b></div><div><span>Gold-58</span><b>0.885</b></div>
+        </div>
+        <p class="lead" style="font-size:.92rem">48 slices from 4 series at 0.63 mm/px. Each window votes alone; each finding averages its top 10% of window scores.</p>
+      </div>
+      <div class="model">
+        <div class="tag">Exp 1c · d96 recipe</div>
+        <h3>r50 d96 SWA 21–25</h3>
+        <div class="scores num">
+          <div><span>Fold 0</span><b>0.9074</b></div><div><span>Public LB</span><b>0.933</b></div><div><span>Gold-58</span><b>0.913</b></div>
+        </div>
+        <p class="lead" style="font-size:.92rem">Same backbone and same labels. 96 slices from 5 series at 0.36 mm/px; learned per-finding attention; fixed cosine schedule and weight averaging.</p>
+      </div>
+      <div class="model proposed">
+        <div class="tag">Exp 2a · proposed</div>
+        <h3>1c + cross-window context</h3>
+        <div class="scores num">
+          <div><span>Fold 0</span><b>—</b></div><div><span>Public LB</span><b>—</b></div><div><span>Gold-58</span><b>—</b></div>
+        </div>
+        <p class="lead" style="font-size:.92rem">Exp 1c unchanged, plus slot and anatomical-position inputs and a 2-layer transformer so windows can see each other before pooling.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="g">
+    <h2 id="g">Stage by stage</h2>
+    <div class="legend">
+      <span><i style="background:var(--accent-soft);border:1px solid var(--accent)"></i>changed from 0.925 to 1c</span>
+      <span><i style="background:var(--new-soft);border:1px solid var(--new)"></i>new in 2a</span>
+      <span><i style="background:transparent;border:1px solid var(--same)"></i>same as the column to its left</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th scope="col">Stage</th>
+          <th scope="col">r50 v3.1-D2 224 <small>LB 0.925</small></th>
+          <th scope="col">Exp 1c d96 <small>LB 0.933</small></th>
+          <th scope="col">Exp 2a <small>proposed</small></th></tr></thead>
+        <tbody>
+          <tr class="group"><th>Input</th><td></td><td></td><td></td></tr>
+          <tr><th>Series</th>
+            <td>4 slots: one per plane first (fluid-sensitive preferred), then a 4th distinct plane/contrast</td>
+            <td class="chg"><b>5 fixed slots:</b> Sag fluid · Sag non-fluid · Cor fluid · Cor non-fluid · Axial (first listed)</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Slices kept</th>
+            <td>12 per slot, evenly spaced in the <b>central 20–80%</b> of the stack · 48 total</td>
+            <td class="chg"><b>26 / 22 / 18 / 12 / 18</b> spread over <b>2–98%</b> of each stack · 96 total. Sagittal edges (medial and lateral gutters) now included</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Field of view</th>
+            <td>140 mm centre crop</td>
+            <td class="same">140 mm centre crop (training); centre 320 px ≈ 117 mm at evaluation</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Resolution</th>
+            <td>224 px · <b>0.63 mm/px</b></td>
+            <td class="chg">384 px · <b>0.36 mm/px</b> (close to native in-plane detail)</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Intensity</th>
+            <td>Per-series clip at 1st–99th percentile</td>
+            <td class="chg">Per-series window at 2nd–98th percentile</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>One window</th>
+            <td>6 channels: 3 neighbouring slices of one series + 3 acquisition-support masks</td>
+            <td class="chg">3 channels: slices c−1, c, c+1 of the 96-slice volume (no masks)</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Windows</th>
+            <td>Train 24 sampled · evaluate all 48</td>
+            <td class="chg">Train 16 (one per 1/16 of the volume, jittered) · evaluate 94</td>
+            <td class="same">same as 1c</td></tr>
+
+          <tr class="group"><th>Model</th><td></td><td></td><td></td></tr>
+          <tr><th>Backbone</th>
+            <td>torchvision ResNet-50, ImageNet</td>
+            <td class="same">ResNet-50 <span class="mono">tv_in1k</span> (same ImageNet weights, via timm)</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Window position</th>
+            <td>Not given to the model</td>
+            <td class="same">Not given to the model</td>
+            <td class="new"><b>Slot embedding</b> (5 learned vectors) + <b>anatomical position</b>: medial↔lateral for sagittal, front↔back for coronal, top↔bottom for axial, from DICOM geometry and knee side</td></tr>
+          <tr><th>Between windows</th>
+            <td>None: each window scored alone</td>
+            <td class="same">None: each window encoded alone</td>
+            <td class="new"><b>2-layer transformer</b> over all windows of the study (2048 → 512, 8 heads), added back through a gate that starts at 0, so step 0 equals 1c</td></tr>
+          <tr><th>Pooling</th>
+            <td>Linear → 12 logits per window, then per finding the <b>mean of the top 10%</b> of window logits</td>
+            <td class="chg">LayerNorm → <b>per-finding attention</b> (softmax over windows) → weighted feature → per-finding linear</td>
+            <td class="same">same as 1c, applied to context-aware features</td></tr>
+
+          <tr class="group"><th>Training</th><td></td><td></td><td></td></tr>
+          <tr><th>Labels</th>
+            <td>HPO-v3.1-D2 soft labels, BCE weighted by label confidence</td>
+            <td class="same">identical file (sha 38367d62…)</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Optimiser</th>
+            <td>lr 3e-4, weight decay 0.03, 5% warm-up · batch 8 studies</td>
+            <td class="chg">AdamW 1e-4 backbone / 1e-3 head, wd 0.05, 1 warm-up epoch · batch 8 (2 × 4 accumulation) · bf16</td>
+            <td class="same">same as 1c; new layers use the head rate</td></tr>
+          <tr><th>Schedule</th>
+            <td>Reduce-on-plateau on fold-0 BCE, early stop on fold-0 AUC (patience 8), up to 60 epochs</td>
+            <td class="chg"><b>Fixed</b> 25-epoch cosine with a 1% floor. Nothing reads fold 0 during training</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Augmentation</th>
+            <td>Shift 6%, intensity jitter, random erase (p 0.25); no mirror, no rotation</td>
+            <td class="chg">Anatomical mirror (p 0.5), rotation ±10°, scale ±10%, shift ±6%, gamma/gain</td>
+            <td class="same">same as 1c (positions are mirror-invariant)</td></tr>
+          <tr><th>Final weights</th>
+            <td>Best single epoch (15), <b>chosen on fold 0</b></td>
+            <td class="chg"><b>Average of epochs 21–25</b> fixed in advance, BatchNorm refreshed</td>
+            <td class="same">same as 1c</td></tr>
+          <tr><th>Cost</th>
+            <td>~1 T4-hour per epoch</td>
+            <td class="chg">H100 · 0.028 s/study · ~$4–5 per run</td>
+            <td class="new">~$5 (adds ~2–3M parameters)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="d">
+    <h2 id="d">The model head, drawn</h2>
+    <div class="diagrams">
+      <figure>
+        <div class="scroll"><pre class="mermaid">
+flowchart TB
+  A["48 windows<br/>6 × 224 × 224"] --> B["ResNet-50<br/>one window at a time"]
+  B --> C["Linear → 12 logits<br/>per window"]
+  C --> D["Per finding:<br/>mean of top 10% windows"]
+  D --> E["12 probabilities"]
+</pre></div>
+        <figcaption><b>0.925 recipe.</b> Each window votes on its own; a finding is called from its strongest few windows.</figcaption>
+      </figure>
+      <figure>
+        <div class="scroll"><pre class="mermaid">
+flowchart TB
+  A["94 windows<br/>3 × 320 × 320"] --> B["ResNet-50<br/>one window at a time"]
+  B --> C["2048-d feature<br/>per window + LayerNorm"]
+  C --> D["Per-finding attention<br/>softmax over windows"]
+  D --> E["Weighted feature<br/>→ per-finding linear"]
+  E --> F["12 probabilities"]
+</pre></div>
+        <figcaption><b>Exp 1c.</b> Each finding learns which windows to read, but every window is still encoded without seeing the others.</figcaption>
+      </figure>
+      <figure>
+        <div class="scroll"><pre class="mermaid">
+flowchart TB
+  A["94 windows<br/>3 × 320 × 320"] --> B["ResNet-50<br/>one window at a time"]
+  B --> C["2048-d feature<br/>+ LayerNorm"]
+  P["slot + anatomical<br/>position"] --> T
+  C --> T["2-layer transformer<br/>windows attend to each other"]
+  T -->|"gate, starts at 0"| S(("+"))
+  C --> S
+  S --> D["Per-finding attention<br/>softmax over windows"]
+  D --> E["Weighted feature<br/>→ per-finding linear"]
+  E --> F["12 probabilities"]
+</pre></div>
+        <figcaption><b>Exp 2a.</b> Windows exchange information before pooling and know where they sit in the knee. At initialisation the gate is 0, so the model starts exactly as 1c.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="w">
+    <h2 id="w">What each step bought, and what 2a is betting on</h2>
+    <div class="spec">
+      <div>
+        <h3>0.925 → 1c: measured</h3>
+        <ul>
+          <li>Fold 0 <span class="gain num">+0.0111</span> [+0.0046, +0.0175], every bootstrap better; LB <span class="gain num">+0.008</span>; gold-58 <span class="gain num">+0.028</span>.</li>
+          <li>Same backbone and labels, so the gain is the recipe: more slices over the full stack, ~1.7× finer pixels, learned pooling, and a schedule that does not pick on fold 0.</li>
+          <li>Largest per-target gains on fold 0: ACL +0.030, medial OA +0.021, lateral OA +0.021, lateral meniscus +0.019, synovitis +0.018.</li>
+          <li>One loss: MCL <span class="loss num">−0.027</span> on fold 0 (0.806, the weakest target), though gold MCL rose to 0.934.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>1c → 2a: hypothesis</h3>
+        <ul>
+          <li>Lateral OA is still weak (fold 0 0.871, gold 0.83). Today's tests ruled out the evaluation crop (Exp 1d) and the label set (Exp 1e, which made gold lateral OA worse).</li>
+          <li>Radiologists confirm compartment OA and MCL injury by matching coronal and sagittal views of the same compartment. 1c cannot relate two windows, and does not know which compartment a sagittal slice is in.</li>
+          <li>2a adds exactly those two things and nothing else, so a change in fold 0 can be attributed to them.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Pre-registered rule for 2a</h3>
+        <ul>
+          <li>Primary: average of epochs 21–25, 94 windows, no TTA, Steven-v4 fold-0 confident cells.</li>
+          <li><b>Pass</b> if 2a beats 1c (0.9074) by <b class="num">≥ +0.003</b> with ≥ 90% of 2,000 paired bootstraps better.</li>
+          <li>Reported, not used to decide: lateral OA, MCL, PF OA per target; gold-58; a 6 × 16-window readout.</li>
+        </ul>
+        <p class="callout">Known risk: training sees 16 windows and evaluation sees 94, so the transformer meets a longer sequence at test time. The 16-window readout shows whether that costs anything.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="c">
+    <h2 id="c">Checks before launch</h2>
+    <ul>
+      <li>Coverage of DICOM geometry and knee side in the d96 manifests; slices without them fall back to their relative index within the slot.</li>
+      <li>Position is anatomical (medial stays medial), so the left/right mirror augmentation does not contradict it.</li>
+      <li>CPU preflight: at initialisation 2a's outputs equal 1c's for the same weights, and one 94-window forward pass is finite.</li>
+    </ul>
+  </section>
+
+  <footer>Sources: run configs and audits in <span class="mono">repository/data/coatnet_d96_fold0/</span> and
+    <span class="mono">hpo_v31_d2_kaggle_outputs/</span>; ledger <span class="mono">docs/experiment_ledger.md</span>.
+    Gold-58 is development evidence only. All-data retrains are on hold until a single model passes 0.95 public.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default"});</script>
+</body>
+</html>

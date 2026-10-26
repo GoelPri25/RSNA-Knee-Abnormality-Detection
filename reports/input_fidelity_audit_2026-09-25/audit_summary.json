@@ -1,0 +1,84 @@
+{
+  "audit": "report_only_input_fidelity_no_training",
+  "seed": 20260925,
+  "maximum_studies": 36,
+  "selected_studies": 36,
+  "selected_series": 180,
+  "decoded_slices": 6609,
+  "dicom_decode_errors": 0,
+  "report_status_coverage": [
+    {
+      "target": "ACL",
+      "present": 13,
+      "absent": 23
+    },
+    {
+      "target": "MCL",
+      "present": 15,
+      "absent": 21
+    },
+    {
+      "target": "Medial Meniscus",
+      "present": 18,
+      "absent": 18
+    },
+    {
+      "target": "Lateral Meniscus",
+      "present": 16,
+      "absent": 20
+    },
+    {
+      "target": "Medial OA",
+      "present": 16,
+      "absent": 20
+    },
+    {
+      "target": "Lateral OA",
+      "present": 17,
+      "absent": 19
+    },
+    {
+      "target": "PF OA",
+      "present": 18,
+      "absent": 18
+    },
+    {
+      "target": "Effusion",
+      "present": 21,
+      "absent": 15
+    },
+    {
+      "target": "Synovitis",
+      "present": 17,
+      "absent": 18
+    },
+    {
+      "target": "Baker's",
+      "present": 17,
+      "absent": 18
+    },
+    {
+      "target": "Contusion",
+      "present": 15,
+      "absent": 20
+    },
+    {
+      "target": "Fracture",
+      "present": 13,
+      "absent": 22
+    }
+  ],
+  "official_gold_target_values_used": false,
+  "official_label_nullness_used_only_to_filter_report_only_studies": true,
+  "report_text_exported": false,
+  "study_or_series_identifiers_exported": false,
+  "model_loaded": false,
+  "training_performed": false,
+  "foreground_measurement": "Otsu intensity bounding-box proxy; not segmentation",
+  "limitations": [
+    "Small, status-stratified descriptive sample; not a clinical association test.",
+    "DICOM support tags do not identify all scanner-generated background.",
+    "Exact zero is treated as a valid value unless a DICOM padding tag says otherwise.",
+    "Physical FOV and foreground proxy do not replace radiologist-reviewed anatomy coverage."
+  ]
+}

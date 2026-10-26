@@ -1,0 +1,53 @@
+{
+  "audit": "frozen_pillar0_support_token_gating_counterfactual",
+  "date": "2026-09-25",
+  "checkpoint_revision": "be5050ba482607f90e607e044f03a2ebc38f98c3",
+  "weights_sha256": "d658fa8aad744c66d1abf43c2bf6bf594e75e834186dce9aadd1b7a9e4381bf0",
+  "study_count": 1,
+  "series_count": 3,
+  "labels_or_reports_read": false,
+  "training_performed": false,
+  "gpu": "Tesla T4",
+  "mean_inference_seconds_per_series": 0.9997131713333344,
+  "token_gating": {
+    "support_threshold": 0.05,
+    "operation": "zero patch-token vectors where support <= threshold before Atlas; retain mixed boundary tokens",
+    "grid_shape": [64, 32, 16]
+  },
+  "planes": [
+    {
+      "plane": "Axial",
+      "canvas_support_fraction": 0.1198788583278656,
+      "gated_out_token_fraction": 0.855987548828125,
+      "baseline_embedding_dimension": 1152,
+      "baseline_embedding_norm": 0.9999999403953552,
+      "gated_embedding_norm": 1.0,
+      "gated_embedding_cosine_to_baseline": 0.8701230883598328,
+      "gated_embedding_relative_l2_change": 0.5096607208251953
+    },
+    {
+      "plane": "Coronal",
+      "canvas_support_fraction": 0.10320670157670975,
+      "gated_out_token_fraction": 0.876068115234375,
+      "baseline_embedding_dimension": 1152,
+      "baseline_embedding_norm": 1.0,
+      "gated_embedding_norm": 1.0,
+      "gated_embedding_cosine_to_baseline": 0.5826513767242432,
+      "gated_embedding_relative_l2_change": 0.9136176705360413
+    },
+    {
+      "plane": "Sagittal",
+      "canvas_support_fraction": 0.09780020266771317,
+      "gated_out_token_fraction": 0.88177490234375,
+      "baseline_embedding_dimension": 1152,
+      "baseline_embedding_norm": 1.0,
+      "gated_embedding_norm": 1.0,
+      "gated_embedding_cosine_to_baseline": 0.8263189196586609,
+      "gated_embedding_relative_l2_change": 0.5893744230270386
+    }
+  ],
+  "interpretation_limit": "One report-only study and no labels: establishes representation sensitivity only, not whether gating improves prediction or generalizes.",
+  "followup_reader_learning_rate": 0.0001,
+  "reference_reader_learning_rate": 0.0003,
+  "persistent_modal_storage": false
+}

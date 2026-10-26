@@ -1,0 +1,116 @@
+{
+  "audit": "frozen_pillar0_spatial_activation_support_audit",
+  "source_revision": "be5050ba482607f90e607e044f03a2ebc38f98c3",
+  "weights_sha256": "d658fa8aad744c66d1abf43c2bf6bf594e75e834186dce9aadd1b7a9e4381bf0",
+  "training_performed": false,
+  "labels_or_reports_read": false,
+  "source_artifacts": "three identifier-free report-only series from Kaggle",
+  "temporary_modal_volume": true,
+  "persistent_modal_storage": false,
+  "gpu": "Tesla T4",
+  "study_count": 1,
+  "series_count": 3,
+  "measured_layer": "breast_mr patch embedding convolution output before multiscale Atlas stages",
+  "support_groups": "core >= 0.95; padding <= 0.05; mixed boundary otherwise",
+  "per_plane": [
+    {
+      "plane": "Axial",
+      "embedding_dim": 1152,
+      "embedding_norm": 0.9999999403953552,
+      "inference_seconds": 1.606083837,
+      "canvas_support_fraction": 0.1198788583278656,
+      "patch_grid": {
+        "grid_shape": [64, 32, 16],
+        "total_cells": 32768,
+        "total_mean_squared_activation": 0.0019344936590641737,
+        "supported_core": {
+          "cells": 3273,
+          "fraction_of_cells": 0.099884033203125,
+          "mean_squared_activation": 0.0031751131173223257,
+          "fraction_of_total_feature_energy": 0.1639411449432373
+        },
+        "unsupported_padding": {
+          "cells": 28049,
+          "fraction_of_cells": 0.855987548828125,
+          "mean_squared_activation": 0.0017721630865707994,
+          "fraction_of_total_feature_energy": 0.7841584086418152
+        },
+        "mixed_boundary": {
+          "cells": 1446,
+          "fraction_of_cells": 0.04412841796875,
+          "mean_squared_activation": 0.002275202190503478,
+          "fraction_of_total_feature_energy": 0.05190044268965721
+        },
+        "padding_to_core_mean_energy_ratio": 0.5581417168737979
+      }
+    },
+    {
+      "plane": "Coronal",
+      "embedding_dim": 1152,
+      "embedding_norm": 1.0,
+      "inference_seconds": 0.865403238999999,
+      "canvas_support_fraction": 0.10320670157670975,
+      "patch_grid": {
+        "grid_shape": [64, 32, 16],
+        "total_cells": 32768,
+        "total_mean_squared_activation": 0.0019239542307332158,
+        "supported_core": {
+          "cells": 2921,
+          "fraction_of_cells": 0.089141845703125,
+          "mean_squared_activation": 0.0032386884558945894,
+          "fraction_of_total_feature_energy": 0.15005692839622498
+        },
+        "unsupported_padding": {
+          "cells": 28707,
+          "fraction_of_cells": 0.876068115234375,
+          "mean_squared_activation": 0.0017780541675165296,
+          "fraction_of_total_feature_energy": 0.8096328973770142
+        },
+        "mixed_boundary": {
+          "cells": 1140,
+          "fraction_of_cells": 0.0347900390625,
+          "mean_squared_activation": 0.0022292279172688723,
+          "fraction_of_total_feature_energy": 0.040310174226760864
+        },
+        "padding_to_core_mean_energy_ratio": 0.5490043861058553
+      }
+    },
+    {
+      "plane": "Sagittal",
+      "embedding_dim": 1152,
+      "embedding_norm": 1.0,
+      "inference_seconds": 0.8361157530000014,
+      "canvas_support_fraction": 0.09780020266771317,
+      "patch_grid": {
+        "grid_shape": [64, 32, 16],
+        "total_cells": 32768,
+        "supported_core": {
+          "cells": 2645,
+          "fraction_of_cells": 0.080718994140625,
+          "mean_squared_activation": 0.003312269225716591,
+          "fraction_of_total_feature_energy": 0.13743068277835846
+        },
+        "unsupported_padding": {
+          "cells": 28894,
+          "fraction_of_cells": 0.88177490234375,
+          "mean_squared_activation": 0.0017888566944748163,
+          "fraction_of_total_feature_energy": 0.8108035326004028
+        },
+        "mixed_boundary": {
+          "cells": 1229,
+          "fraction_of_cells": 0.037506103515625,
+          "mean_squared_activation": 0.002685090759769082,
+          "fraction_of_total_feature_energy": 0.051765840500593185
+        },
+        "padding_to_core_mean_energy_ratio": 0.5400698350804521
+      }
+    }
+  ],
+  "pairwise_embedding_cosine": {
+    "Axial__Coronal": 0.44268810749053955,
+    "Axial__Sagittal": 0.7619112730026245,
+    "Coronal__Sagittal": 0.47410327196121216
+  },
+  "mean_inference_seconds": 1.1025342763333335,
+  "interpretation_limit": "Early patch-feature energy is a localization diagnostic, not causal attribution or evidence of AUC improvement."
+}

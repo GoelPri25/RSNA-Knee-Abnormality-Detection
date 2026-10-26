@@ -1,0 +1,33 @@
+{
+  "audit": "pillar0_legacy_vs_support_aware_inputs_no_model_no_training",
+  "seed": 20260925,
+  "study_count": 1,
+  "series_count": 3,
+  "planes": [
+    "Axial",
+    "Coronal",
+    "Sagittal"
+  ],
+  "official_label_values_used": false,
+  "only_official_nullness_used_to_select_report_only": true,
+  "report_text_exported": false,
+  "identifiers_exported": false,
+  "model_loaded": false,
+  "training_performed": false,
+  "historical_preprocessing_source": "kaggle/experiment_kernels/pillar0_small_sample.ipynb, preprocess_for_pillar",
+  "support_policy": "finite decoded values excluding PixelPaddingValue/PixelPaddingRangeLimit; exact zero remains valid",
+  "input_tensor_shape_per_series": [
+    1,
+    384,
+    384,
+    192
+  ],
+  "input_dtype_in_archive": "float16, one channel per variant; support map pooled to 64x32x16",
+  "archive_bytes": 24680512,
+  "limitations": [
+    "One report-only study; this is a preprocessing diagnostic, not a generalization test.",
+    "PixelPadding tags cannot identify scanner background that is not declared as padding.",
+    "Support is not an anatomical segmentation.",
+    "No encoder embeddings were computed in this CPU preprocessing kernel."
+  ]
+}

@@ -1,0 +1,1859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J1 Layer by Layer</title>
+<style>
+:root{
+  --bg:#f7f6f2; --panel:#ffffff; --panel2:#f0eee8; --ink:#1d1d1b; --muted:#65635c; --line:#dcd8cd;
+  --r:#2f6fd0; --r-soft:#dce8fa; --s:#d9771b; --s-soft:#fbe7d3; --f:#7b4bc9; --f-soft:#ebe1fa;
+  --l:#c23b4a; --l-soft:#f8dde0; --ok:#2c8a57; --frozen:#9a978e; --frozen-soft:#e7e5df; --hl:#fff4b8;
+  --code:#f1efe9; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --panel:#1f2024; --panel2:#26282d; --ink:#e9e7e1; --muted:#a3a097; --line:#3a3c42;
+    --r:#6ea2f2; --r-soft:#1f3150; --s:#f0a057; --s-soft:#4a3218; --f:#b18cf0; --f-soft:#36294f;
+    --l:#ef7a86; --l-soft:#4d2329; --ok:#5cc28a; --frozen:#7d7b75; --frozen-soft:#2b2c30; --hl:#4a4320;
+    --code:#25272c; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --panel:#1f2024; --panel2:#26282d; --ink:#e9e7e1; --muted:#a3a097; --line:#3a3c42;
+  --r:#6ea2f2; --r-soft:#1f3150; --s:#f0a057; --s-soft:#4a3218; --f:#b18cf0; --f-soft:#36294f;
+  --l:#ef7a86; --l-soft:#4d2329; --ok:#5cc28a; --frozen:#7d7b75; --frozen-soft:#2b2c30; --hl:#4a4320;
+  --code:#25272c; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+code,.mono,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:.86em}
+code{background:var(--code);padding:.08em .35em;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow:auto;line-height:1.45}
+a{color:var(--r)}
+h1,h2,h3,h4{line-height:1.25;margin:1.4em 0 .5em}
+h1{font-size:2.1rem;margin-top:.2em}
+h2{font-size:1.55rem;border-top:1px solid var(--line);padding-top:1.1em;margin-top:2.2em}
+h3{font-size:1.15rem}
+h4{font-size:1rem;margin:1em 0 .3em}
+p{margin:.55em 0}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow:auto;padding:22px 16px 40px 20px;border-right:1px solid var(--line);background:var(--panel2);font-size:.88rem}
+nav.toc a{display:block;color:var(--ink);text-decoration:none;padding:3px 6px;border-radius:5px}
+nav.toc a:hover,nav.toc a.on{background:var(--panel)}
+nav.toc .tt{font-weight:700;margin-bottom:10px;font-size:1rem}
+nav.toc .sub{padding-left:16px;color:var(--muted);font-size:.84rem}
+main{padding:28px 40px 120px;max-width:1560px;min-width:0}
+.lede{font-size:1.08rem;color:var(--muted);max-width:860px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow)}
+.card .k{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.card .v{font-size:1.25rem;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .d{font-size:.82rem;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:var(--shadow)}
+.callout{border-left:4px solid var(--f);background:var(--f-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.callout.r{border-color:var(--r);background:var(--r-soft)}
+.callout.s{border-color:var(--s);background:var(--s-soft)}
+.callout.l{border-color:var(--l);background:var(--l-soft)}
+.callout.g{border-color:var(--frozen);background:var(--frozen-soft)}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:999px;vertical-align:1px;white-space:nowrap}
+.tag.R{background:var(--r-soft);color:var(--r)} .tag.S{background:var(--s-soft);color:var(--s)}
+.tag.F,.tag.H{background:var(--f-soft);color:var(--f)} .tag.L{background:var(--l-soft);color:var(--l)}
+.tag.Z{background:var(--frozen-soft);color:var(--frozen)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:8px 0 12px;font-size:.9rem}
+.ctrl label{display:inline-flex;align-items:center;gap:6px}
+.ctrl input[type=range]{width:150px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--ink);padding:5px 11px;font:inherit;font-size:.86rem;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--bg)}
+button.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 12px;border-radius:8px;font:inherit;font-size:.86rem;cursor:pointer}
+button.btn:hover{background:var(--panel2)}
+select,input[type=text],input[type=number]{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:.88rem}
+input[type=number]{width:64px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}
+th{font-weight:650;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;background:var(--panel2);position:sticky;top:0;z-index:1}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.small{font-size:.84rem;color:var(--muted)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.two.pl{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.two>*,.steps>*{min-width:0}
+.svgbox svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.82rem;color:var(--muted);margin:6px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* explorer */
+.explorer{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px;align-items:start}
+.explorer .tablewrap{max-height:78vh}
+#xtable tr.row{cursor:pointer}
+#xtable tr.row:hover td{background:var(--panel2)}
+#xtable tr.row.sel td{background:var(--hl)}
+#xtable tr.grp td{background:var(--panel2);font-weight:650;cursor:pointer;font-size:.82rem}
+#xtable td.path{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;min-width:190px;overflow-wrap:anywhere}
+#xtable td.shape{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;white-space:nowrap}
+#xtable tr.frozen td{color:var(--frozen)}
+#xtable td.n{white-space:nowrap}
+.bar-i{display:inline-block;height:8px;border-radius:2px;vertical-align:middle}
+.detail{position:sticky;top:12px;max-height:94vh;overflow:auto}
+.detail h3{margin-top:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:.86rem;margin:8px 0}
+.kv div:nth-child(odd){color:var(--muted)}
+.kv .mono{word-break:break-all}
+.fwd{border-left:3px solid var(--ok);padding-left:10px;margin:10px 0}
+.bwd{border-left:3px solid var(--l);padding-left:10px;margin:10px 0}
+.int{border-left:3px solid var(--f);padding-left:10px;margin:10px 0}
+.fwd b.h,.bwd b.h,.int b.h{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.fwd b.h{color:var(--ok)} .bwd b.h{color:var(--l)} .int b.h{color:var(--f)}
+canvas{max-width:100%;image-rendering:pixelated;border-radius:6px}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.78rem;padding:5px 8px;border-radius:6px;z-index:50;display:none;max-width:320px;line-height:1.35}
+.heat td{text-align:center;font-variant-numeric:tabular-nums;font-size:.78rem;padding:4px 3px}
+.steps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px}
+.steps ol{margin:0;padding-left:20px}
+.steps li{padding:4px 6px;border-radius:6px;cursor:pointer}
+.steps li.on{background:var(--hl)}
+.mathline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86rem;background:var(--code);padding:8px 10px;border-radius:6px;margin:8px 0;overflow:auto;white-space:pre}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:.8rem;margin:2px}
+.fail{color:var(--l);font-weight:700} .pass{color:var(--ok);font-weight:700}
+.themebtn{position:fixed;right:14px;top:12px;z-index:30}
+@media (max-width:1700px){.explorer{grid-template-columns:1fr}.detail{position:static;max-height:none}.explorer .tablewrap{max-height:52vh}}
+@media (max-width:860px){
+  .layout{grid-template-columns:1fr} nav.toc{display:none}
+  main{padding:18px 16px 80px} .two,.steps,.two.pl{grid-template-columns:minmax(0,1fr)!important}
+  .ctrl label{flex-wrap:wrap;max-width:100%}
+  .ctrl input[type=range]{width:110px}
+}
+</style>
+</head>
+<body>
+<button class="btn themebtn" id="themeBtn" title="Toggle light / dark">◐ theme</button>
+<div class="tip" id="tip"></div>
+<div class="layout">
+<nav class="toc" id="toc">
+  <div class="tt">J1, layer by layer</div>
+  <a href="#s-top">0. What J1 is</a>
+  <a href="#s-map">1. The whole network</a>
+  <a href="#s-data">2. Inputs: one study, two views</a>
+  <a class="sub" href="#s-data-r">2a ResNet windows</a>
+  <a class="sub" href="#s-data-s">2b Swin volumes</a>
+  <a class="sub" href="#s-aug">2c Augmentation lab</a>
+  <a href="#s-explorer">3. Every layer (forward / backward)</a>
+  <a href="#s-resnet">4. Inside the ResNet branch</a>
+  <a href="#s-swin">5. Inside the Swin branch</a>
+  <a class="sub" href="#s-win">5a Window explorer</a>
+  <a href="#s-heads">6. Attention-pooling heads</a>
+  <a class="sub" href="#s-pool">6a Pooling + gradient lab</a>
+  <a href="#s-fusion">7. Fusion: one softmax, two branches</a>
+  <a href="#s-loss">8. Loss</a>
+  <a href="#s-backward">9. Backward pass</a>
+  <a class="sub" href="#s-gradmap">9a Gradient-flow map</a>
+  <a class="sub" href="#s-bwalk">9b Backward walk-through</a>
+  <a href="#s-optim">10. Optimiser and schedule</a>
+  <a href="#s-step">11. One optimiser step</a>
+  <a href="#s-dyn">12. 20 epochs of training</a>
+  <a href="#s-swa">13. SWA, BN refresh, evaluation</a>
+  <a href="#s-results">14. What it learned, why it failed</a>
+  <a href="#s-config">Appendix: full config</a>
+</nav>
+<main>
+
+<!-- ============================================================ 0 -->
+<section id="s-top">
+<h1>J1, layer by layer</h1>
+<p class="lede">J1 is one network with two encoders. A 2.5D <b style="color:var(--r)">ResNet-50</b> reads 3-slice windows, and a 3D <b style="color:var(--s)">Swin3D-T</b> reads whole MRI series. A <b style="color:var(--f)">fusion head</b> joins them with a single per-finding attention softmax over both branches' tokens. All three parts were trained end to end for 20 epochs on fold 0. This page traces one knee study through every layer, forward and backward, using the exact shapes, learning rates and numbers from <code>scripts/joint_r50_swin_runner.py</code> and the run logs. Every widget is live: change the inputs and the numbers update.</p>
+<div class="cards" id="heroCards"></div>
+<div class="callout">
+<b>Reading guide.</b> Colours are fixed throughout: <span class="tag R">ResNet branch</span> <span class="tag S">Swin branch</span> <span class="tag F">fusion / heads</span> <span class="tag L">loss / gradient</span> <span class="tag Z">frozen (no gradient)</span>.
+Shapes are written PyTorch-style, e.g. <code>[32, 256, 96, 96]</code> = batch × channels × height × width. In training, one forward pass holds <b>2 studies</b>, and 4 forward passes are accumulated into one optimiser step of 8 studies.
+</div>
+</section>
+
+<!-- ============================================================ 1 -->
+<section id="s-map">
+<h2>1. The whole network on one screen</h2>
+<p>Click any box to jump to its layers in the explorer (section 3). Arrows show the forward data flow; section 9 replays the same picture with the gradients flowing back.</p>
+<div class="panel svgbox" id="mapBox"></div>
+<div class="two">
+<div>
+<h4>What a "token" means on each side</h4>
+<p><b style="color:var(--r)">ResNet token</b> = one 3-slice window (slices <i>c−1, c, c+1</i> stacked as RGB), squeezed by ResNet-50 and global average pooling into one 2048-d vector. Training uses 16 windows per study, evaluation 94. The 2D CNN has no idea which window came from where. Order and position are not encoded (<code>R.context</code> is the identity).</p>
+<p><b style="color:var(--s)">Swin token</b> = one cell of the stage-4 grid of one series. Each covers 2 slices × 32 × 32 pixels of the 320-px crop, after 12 layers of windowed 3D self-attention. One series of <i>T</i> slices gives ⌈T/2⌉ × 10 × 10 tokens. A study gives thousands, and each is tagged with a learned series embedding.</p>
+</div>
+<div>
+<h4>The three outputs and the loss</h4>
+<p>Each branch keeps its <b>own</b> per-finding attention head (deep supervision). Each head produces 12 logits. The fusion head produces a third set of 12 logits from the union of both token sets. All three are trained against the same soft labels (label-v2):</p>
+<div class="mathline">loss = BCE(fused) + 0.5 × ( BCE(ResNet head) + BCE(Swin head) )</div>
+<p>Only the fused logits are the model's prediction (<code>val_swa.json</code>). The branch heads exist to keep each encoder learning on its own.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section id="s-data">
+<h2>2. Inputs: one study, two views of the same knee</h2>
+<p>The <code>Both</code> dataset returns, for one study id, the ResNet windows from the <b>d96 cache</b> and the Swin volume from the <b>d96n cache</b>. These are two different preprocessings of the same DICOM series. Labels <i>y</i> [12] (soft, 0–1) and cell weights <i>w</i> [12] come from label-v2 (<code>soft_labels_final_per_target_latD2.json</code>, sha dd0ab9ab…). The data loader uses 8 workers. The GPU then does all augmentation (<code>rr.prepare</code> and <code>s.Prep</code>).</p>
+
+<h3 id="s-data-r">2a. ResNet input: 3-slice windows from a 96-slice stack</h3>
+<p>The d96 cache resamples every study into exactly <b>96 slices</b> of 384×384 uint8 pixels covering a 140 mm field. The slices sit in 5 fixed slots: sagittal fat-sat (26), sagittal T1 (22), coronal fat-sat (18), coronal T1 (12), axial (18). A boolean mask marks slices that hold real data. <code>centres()</code> takes the interior of the valid range [lo+1, hi−1] (the <i>whole</i> range from the first to the last valid slice, so slot boundaries and missing slots in between are ignored, as in the public recipe). It then picks window centres <i>c</i>:</p>
+<ul>
+<li><b>Training:</b> the interior is split into 16 equal bins, and one random centre is drawn per bin (stratified). Every window set covers the whole stack, but with different slices each epoch.</li>
+<li><b>Evaluation:</b> 94 evenly spaced centres (<code>linspace</code> + rounding). If the interior has fewer than 94 slices, some centres repeat. Repeats are harmless because attention pooling just sees duplicate tokens.</li>
+</ul>
+<p>Each window is <code>vol[[c−1, c, c+1]]</code>, so 3 neighbouring slices become the 3 "colour" channels of an ImageNet ResNet. That is the 2.5D trick: through-plane context enters via the first conv.</p>
+<div class="panel">
+<div class="ctrl">
+<span class="seg" id="wsMode"><button data-v="train" class="on">training (16)</button><button data-v="eval">evaluation (94)</button></span>
+<button class="btn" id="wsResample">↻ draw new training centres</button>
+<label><input type="checkbox" id="wsMissCT1"> coronal T1 missing</label>
+<label><input type="checkbox" id="wsMissAx"> axial missing</label>
+<label><input type="checkbox" id="wsShort"> short sagittal FS (only 18 valid)</label>
+</div>
+<canvas id="wsCanvas" width="1100" height="170" style="width:100%;height:auto"></canvas>
+<div class="small" id="wsInfo"></div>
+</div>
+
+<h3 id="s-data-s">2b. Swin input: native series as 3D volumes</h3>
+<p>The d96n cache keeps the <b>native slices</b> of up to four series per study: sagittal fat-sat, sagittal non-fat-sat, coronal and axial (slots 0–3). It keeps every native slice inside the 2–98% extent, capped at 40 per series, at 384×384. <code>s.Prep</code> turns each series into a tensor <code>[1, 3, T, 320, 320]</code>: grey value / 255, the same value copied into 3 channels (the Kinetics video model expects RGB), normalised with the Kinetics-400 weights' own mean and std. Series are encoded <b>one at a time</b> (batch 1), so each can have its own depth <i>T</i>. Set the depths below. They drive every Swin shape in this page.</p>
+<div class="panel">
+<div class="ctrl" id="tCtrl"></div>
+<div class="tablewrap"><table id="tokTable"></table></div>
+<p class="small">Default depths are illustrative. Real studies vary, and the cap is 40 slices. In training, a series of ≥ 16 slices is subsampled to every other slice with p 0.25 ("stride 2"). Each series is dropped with p 0.1, but one is always kept. Tick a box to simulate this for the shapes.</p>
+</div>
+
+<h3 id="s-aug">2c. Augmentation lab</h3>
+<p>All augmentation runs on the GPU after loading. The two branches use different policies, and both draw their own random numbers. The only thing they share is the study. In training, the ResNet's mirror flag and the Swin's mirror flag are drawn independently (one per branch per study). The picture below is a <b>synthetic phantom</b> (not patient data), drawn so each operation is visible.</p>
+<div class="panel">
+<div class="ctrl">
+<span class="seg" id="augBranch"><button data-v="R" class="on">ResNet window (384, full field)</button><button data-v="S">Swin series (320 crop)</button></span>
+<button class="btn" id="augDraw">🎲 random draw (the real distributions)</button>
+<button class="btn" id="augReset">reset</button>
+</div>
+<div class="two">
+<div style="text-align:center">
+<canvas id="augSrc" width="256" height="256" style="width:48%"></canvas>
+<canvas id="augOut" width="256" height="256" style="width:48%"></canvas>
+<div class="small">left: cached slice (384 px, 140 mm) · right: what the network sees</div>
+</div>
+<div>
+<div class="ctrl" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px" id="augCtrls"></div>
+</div>
+</div>
+<div class="small" id="augNote"></div>
+</div>
+<div class="two">
+<div class="callout r"><b>ResNet policy</b> (<code>rr.prepare</code>, one draw per <i>study</i>, shared by all 16 windows):
+mirror p 0.5. A sagittal window <i>reverses its 3 slice channels</i> (left/right in a sagittal stack is through-plane), while other windows flip width. Rotation ±10°, scale ±10%, shift ±6% of the width (via <code>affine_grid</code> + bilinear <code>grid_sample</code>, zero padding), gamma <i>x</i><sup>exp(U(−.25,.25))</sup>, gain ×(1 ± 0.1), clamp to [0,1], ImageNet mean/std, <code>channels_last</code>. Training output: 384×384, the full 140 mm field. <b>Evaluation:</b> no augmentation, the <b>centre 320×320 crop</b> with no resize (same pixel scale, 117 mm field).</div>
+<div class="callout s"><b>Swin policy</b> (<code>s.Prep</code> with B2's <code>aug2</code>): mirror per study (sagittal series flip their <i>slice order</i>, the others flip width). Series dropout p 0.1 (one always kept). Stride-2 p 0.25 for series ≥ 16 slices. A <b>separate</b> affine / gamma / gain draw per <i>series</i>, warped straight into the 320 crop at native pixel scale. Then MR-specific noise: bias field p 0.3 (4×4 random grid, bicubic, exp(≤0.3·g)), blur <i>or</i> unsharp-mask p 0.2 each (σ 0.5–1 px), Gaussian noise p 0.2 (σ ≤ 0.03), clamp. <b>Evaluation:</b> centre 320 crop, nothing else.</div>
+</div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section id="s-explorer">
+<h2>3. Every layer, forward and backward</h2>
+<p>This table lists every operation that touches one training (or evaluation) forward pass, in execution order: <b id="xCount"></b>. Click a row for what it computes, what its gradient is, and why it is there. Switch the direction to <b>backward</b> to walk the same graph in reverse: the order in which autograd visits it, what gradient arrives, and what gets passed down. Press ▶ to animate the walk.</p>
+<div class="panel">
+<div class="ctrl">
+<span class="seg" id="xMode"><button data-v="train" class="on">training forward</button><button data-v="eval">evaluation</button></span>
+<span class="seg" id="xDir"><button data-v="fwd" class="on">forward ↓</button><button data-v="bwd">backward ↑</button></span>
+<span class="seg" id="xFilter"><button data-v="all" class="on">all</button><button data-v="R">ResNet</button><button data-v="S">Swin</button><button data-v="H">heads + fusion</button><button data-v="L">loss</button></span>
+<label>Swin series <select id="xSeries"></select></label>
+<label><input type="checkbox" id="xParamsOnly"> only layers with parameters</label>
+<label><input type="checkbox" id="xExpand"> expand all blocks</label>
+<input type="text" id="xSearch" placeholder="search (e.g. layer3.2, qkv, gate)" style="width:220px">
+<button class="btn" id="xPlay">▶ play</button>
+<label>speed <input type="range" id="xSpeed" min="100" max="1500" value="600" style="width:90px"></label>
+</div>
+<div class="small" id="xSummary"></div>
+</div>
+<div class="explorer">
+<div class="tablewrap"><table id="xtable"></table></div>
+<div class="panel detail" id="xDetail"><p class="small">Select a row.</p></div>
+</div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section id="s-resnet">
+<h2>4. Inside the ResNet branch (Exp 1e recipe)</h2>
+<p>The branch is <code>timm resnet50.tv_in1k</code> (torchvision ImageNet weights) with its classifier removed (<code>num_classes=0</code>), so it ends in global average pooling to 2048 numbers. It is a plain 2D CNN. All 32 windows of a training forward pass (2 studies × 16) run through it as one batch of 32 independent images. The CNN does not know that windows 0–15 belong to one knee and 16–31 to another. Only the heads regroup them per study (<code>.view(b, K, 2048)</code>).</p>
+<div class="two">
+<div>
+<h4>How information is transformed, stage by stage</h4>
+<div class="tablewrap"><table id="rfTable"></table></div>
+<p class="small">Theoretical receptive field (RF) along the main path, in input pixels. At 384 px over 140 mm, one pixel ≈ 0.36 mm. Each layer-4 cell's RF is larger than the window, but its <i>effective</i> RF is concentrated near its centre.</p>
+</div>
+<div>
+<h4>The bottleneck block: why 1×1 → 3×3 → 1×1</h4>
+<p>Every one of the 16 blocks does the same thing. A <b>1×1 conv</b> squeezes channels 4× (e.g. 1024 → 256). That mixes features at each pixel without looking at neighbours. A <b>3×3 conv</b> works in the cheap squeezed space and is the only place spatial context is gathered. In the first block of layers 2–4 it also carries the stride 2 that halves the grid (torchvision style: the stride is on the 3×3, not the 1×1). A second <b>1×1 conv</b> expands back 4×. The result is <b>added</b> to the block's input (the skip). The block therefore learns a <i>correction</i> to its input rather than a whole new representation. In the backward pass the skip is a gradient highway: ∂L/∂input receives ∂L/∂output unchanged plus whatever the residual path contributes.</p>
+<p>Each conv is followed by BatchNorm. In the first block of each layer, the shapes differ, so the skip itself is a 1×1 conv (stride 2 except in layer 1) + BN, called the <i>downsample</i> path.</p>
+</div>
+</div>
+<div class="callout r"><b>BatchNorm has a quirk in this setup.</b> In training, BN normalises each channel with the mean and variance over the 32 windows × H × W positions of the current forward pass. Those statistics mix 2 different knees and 5 different sequence types (fat-sat is dark, T1 is bright fat). Each window's activations therefore depend slightly on the other windows in the batch. The running averages (momentum 0.1) collected this way are discarded at the end. After SWA, every BN layer is reset and re-estimated from 256 training studies (section 13). The ResNet backbone's AdamW group has weight decay 0.05 on <i>every</i> parameter, including BN γ/β (no exclusion list on this side).</div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section id="s-swin">
+<h2>5. Inside the Swin branch (Model B2 recipe)</h2>
+<p><code>torchvision swin3d_t</code> with Kinetics-400 video weights. A "video" here is an MRI series: time ↔ slice depth. The network has 4 stages of shifted-window 3D self-attention, with depths [2, 2, 6, 2], heads [3, 6, 12, 24] (always 32 dims per head) and widths 96 → 192 → 384 → 768. Patch merging between stages halves only height and width. <b>Depth is merged once, by the patch embedding (2 slices → 1 token), and never again.</b></p>
+<div class="two">
+<div>
+<h4>Frozen vs trained</h4>
+<p>B2 sets <code>freeze = 4</code>. The patch embedding, stage 1, patch-merge 1, stage 2 and patch-merge 2 (1.54 M parameters) have <code>requires_grad = False</code> and run inside <code>torch.no_grad()</code>. Autograd records nothing there and stores no activations, and the Kinetics features pass through unchanged. These modules are also forced into <code>eval()</code> on every <code>model.train()</code> call, so their stochastic depth is off. Stage 3, patch-merge 3, stage 4 and the final norm (26.3 M) are trained with layer-wise learning-rate decay.</p>
+<h4>Code layout</h4>
+<p><code>S.shared = features[:5]</code> = stage 1, PM1, stage 2, PM2, stage 3. <code>S.branch[0] = (PM3, stage 4, norm)</code>, a deep copy of the pretrained <code>features[5:7]</code> and <code>norm</code>. B1 had 3 plane-specific branches. B2/J1 uses <code>branches = 1</code>, so every series goes through the same weights and the series identity is added later as an embedding.</p>
+</div>
+<div>
+<h4>One Swin block</h4>
+<div class="mathline">x ← x + DropPath( W-MSA( LN₁(x) ) )        # window attention
+x ← x + DropPath( MLP( LN₂(x) ) )          # 4× expansion, GELU</div>
+<p><b>W-MSA</b> splits the [T′, H′, W′] token grid into non-overlapping 8 × 7 × 7 windows (392 tokens) and does full self-attention <i>inside</i> each window only. Every other block shifts the grid by (4, 3, 3) first, so the next windows straddle the previous boundaries and information leaks across windows. A learned <b>relative position bias</b> (one scalar per head for each of the 15 × 13 × 13 = 2,535 possible 3D offsets) tells attention how far apart two tokens are. Stochastic depth ("DropPath") drops the whole residual branch of a series with probability rising linearly from 0 (block 0) to 0.25 (block 11).</p>
+</div>
+</div>
+
+<h3 id="s-win">5a. Window explorer</h3>
+<p>Pick a stage and a block type, then hover over a token to see exactly which tokens it attends to. Hatched cells are zero <b>padding</b>: the grid is padded up to a multiple of the window. In the shifted block, padding is added <i>before</i> the cyclic roll, so windows wrap around the edges. The shift mask (−100 added to the attention logits, about −∞ after softmax) stops tokens that were rolled in from the far side from talking to each other. Padding tokens themselves are not masked (torchvision behaviour). They act as zero inputs whose keys and values are just the qkv bias.</p>
+<div class="panel">
+<div class="ctrl">
+<span class="seg" id="winStage"><button data-v="0" class="on">stage 1 (80×80)</button><button data-v="1">stage 2 (40×40)</button><button data-v="2">stage 3 (20×20)</button><button data-v="3">stage 4 (10×10)</button></span>
+<span class="seg" id="winShift"><button data-v="0" class="on">regular block</button><button data-v="1">shifted block</button></span>
+<label>series <select id="winSeries"></select></label>
+</div>
+<div class="two">
+<canvas id="winCanvas" width="560" height="560" style="width:100%;max-width:560px"></canvas>
+<div><div id="winInfo"></div><canvas id="winT" width="520" height="90" style="width:100%"></canvas><div class="small">Depth axis (T′ tokens = slice pairs): windows of 8 along depth, shift 4 in shifted blocks. If T′ ≤ 8 the window shrinks to T′ and the depth shift is switched off.</div></div>
+</div>
+</div>
+<div class="two">
+<div>
+<h4>Relative position bias, concretely</h4>
+<p>For two tokens in a window at 3D offsets (Δt, Δh, Δw), with Δt ∈ [−7, 7] and Δh, Δw ∈ [−6, 6], the attention logit gets <code>table[index(Δ), head]</code> added. The table has shape <code>[2535, heads]</code>: [2535, 12] in stage 3 and [2535, 24] in stage 4. The pretrained table encodes Kinetics motion priors, such as "the token one frame later at the same place matters". Fine-tuning reshapes it into slice-neighbour priors. These tables are trained (in stages 3–4) without weight decay. Their gradient is the sum of ∂L/∂logit over <i>every</i> pair of tokens with that offset, in every window of every series in the step.</p>
+</div>
+<div>
+<h4>Patch merging (between stages)</h4>
+<p>Concatenate each 2×2 group of neighbouring tokens (in H and W only) into one 4C vector, apply LayerNorm(4C), then a Linear 4C → 2C without bias. The grid halves in H and W, depth T′ stays, and channels double. Backward: the 4C gradient is split back into the 4 source tokens, so each source token gets its own slice of the gradient.</p>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section id="s-heads">
+<h2>6. The three attention-pooling heads</h2>
+<p>All three heads in J1 share one design, the "Raptor" head of the public CoAtNet recipe. A study is a <b>bag of tokens</b> <i>h</i><sub>n</sub>. For each of the 12 findings separately, the head learns <i>where to look</i> (an attention distribution over the tokens) and <i>what to read</i> (a linear classifier on the attention-weighted average):</p>
+<div class="mathline">e[n, k] = MLP(h_n)[k]              MLP = Linear(d,256) → tanh → Dropout(0.2) → Linear(256,12)
+a[·, k] = softmax_n( e[·, k] )      one distribution over tokens per finding k
+pooled_k = Σ_n a[n,k] · h_n         [12, d]  (an attention-weighted mean token per finding)
+z_k = pooled_k · clsW[k] + clsb[k]  one dot product per finding  → logit</div>
+<p>Because <i>z</i><sub>k</sub> is linear in the pooled vector, <code>z_k = Σ_n a[n,k] · v[n,k] + b</code>, where <code>v[n,k] = h_n · clsW[k]</code> is token n's <b>vote</b> for finding k. A head's logit is therefore a <b>weighted average of per-token votes</b>, and the attention decides whose vote counts. This makes the backward pass easy to read: see the lab.</p>
+<div class="tablewrap"><table id="headTable"></table></div>
+
+<h3 id="s-pool">6a. Pooling + gradient lab: one finding, six tokens</h3>
+<p>Three ResNet windows (R1–R3) and three Swin tokens (S1–S3) for one finding. Drag their attention scores <i>e</i> and votes <i>v</i>, set the soft label <i>y</i>, and watch the forward numbers and every gradient. Press <b>SGD step</b> to move <i>e</i>, <i>v</i> and the gate against their gradients and see the loss fall. The fused head works exactly like this, with a gate and a count prior added to the scores.</p>
+<div class="panel">
+<div class="ctrl">
+<label>soft label y <input type="range" id="plY" min="0" max="1" step="0.05" value="1"><span id="plYv"></span></label>
+<label>gate (R − S) <input type="range" id="plG" min="-3" max="3" step="0.05" value="0"><span id="plGv"></span></label>
+<label>step size <input type="range" id="plLr" min="0.1" max="3" step="0.1" value="1"><span id="plLrv"></span></label>
+<button class="btn" id="plStep">SGD step</button><button class="btn" id="plStep10">×10</button><button class="btn" id="plReset">reset</button><button class="btn" id="plRand">random</button>
+</div>
+<div class="two pl">
+<div class="tablewrap"><table id="plTable"></table></div>
+<div id="plOut"></div>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section id="s-fusion">
+<h2>7. Fusion: one softmax over the union of both branches</h2>
+<p>For each study, both token sets are projected into a common 512-d space, and the fused head runs the same pooling as section 6 over all of them together:</p>
+<div class="mathline">u_R = LN( Linear_2048→512( h_R ) ) + kind[0]          [K, 512]   K = 16 (train) / 94 (eval)
+u_S = LN( Linear_768→512 ( h_S ) ) + kind[1]          [N, 512]   N = Σ_series ⌈T/2⌉·100
+u   = concat(u_R, u_S)                                 [K+N, 512]
+prior[n,k] = gate[branch(n), k] − log(count of that branch)
+a   = softmax_n( att(u)[n,k] + prior[n,k] )            [K+N, 12]   one distribution per finding
+z_k = (Σ_n a[n,k] u_n) · clsW[k] + clsb[k]             share_k = Σ_{n∈R} a[n,k]</div>
+<p><b>Why −log(count)?</b> Without it, about 16 ResNet tokens compete with about 6,000 Swin tokens. At initialisation, when all scores are about equal, the ResNet branch would get 16/6,016 ≈ 0.3% of the attention. Its share would also change between training (16 windows) and evaluation (94 windows). Subtracting log(count) makes each branch's total mass equal to <code>exp(gate)·mean(exp(score))</code>, which depends on the <i>average</i> score, not the number of tokens. The branches start at 50/50, and the learned <code>gate</code> [2, 12] (initialised at 0) moves the balance per finding. Only <code>gate[R] − gate[S]</code> matters.</p>
+<div class="panel">
+<div class="ctrl">
+<label>finding <select id="fuFind"></select></label>
+<span class="seg" id="fuK"><button data-v="16" class="on">K = 16 (train)</button><button data-v="94">K = 94 (eval)</button></span>
+<label><input type="checkbox" id="fuPrior" checked> −log(count) prior</label>
+<label>gate R − S <input type="range" id="fuGate" min="-3" max="3" step="0.01" value="0"><span id="fuGatev"></span></label>
+<label>mean score R − S <input type="range" id="fuMu" min="-3" max="3" step="0.05" value="0"><span id="fuMuv"></span></label>
+<label>score spread σ <input type="range" id="fuSig" min="0" max="3" step="0.05" value="1"><span id="fuSigv"></span></label>
+<label><input type="checkbox" id="fuDrop"> branch dropout (drop ResNet tokens)</label>
+</div>
+<div id="fuOut"></div>
+<canvas id="fuCanvas" width="1100" height="140" style="width:100%;height:auto"></canvas>
+<div class="small">Bottom strip: every token's attention weight a[n,k] (ResNet windows on the left, each side on its own vertical scale; Swin tokens are summed per pixel column because each one carries only ~1/N of the mass). The token count N is taken from section 2b.</div>
+</div>
+<div class="two">
+<div class="callout"><b>Branch dropout.</b> In training, each study, with probability 0.15, removes one randomly chosen branch's tokens from the <i>fused</i> pool: 7.5% drop the ResNet tokens, 7.5% drop the Swin tokens. That branch's own head still runs and still gets its auxiliary loss. If a study has no Swin series, the ResNet tokens are always kept. The aim was to stop the fused head from leaning entirely on one branch.</div>
+<div class="callout"><b>What the fused head turned out to be.</b> One softmax over the union factorises exactly: <code>a[n,k] = m_R,k · (within-ResNet softmax)</code> for n ∈ R, and likewise for S. The fused logit is therefore a <b>gated mixture of two pooled vectors</b>, with no token-to-token interaction between the branches. After training, the ResNet mass m<sub>R</sub> was nearly constant per finding (study-to-study sd 0.05–0.10). See section 14.</div>
+</div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section id="s-loss">
+<h2>8. Loss</h2>
+<div class="mathline">BCE(z, y, w) = Σ_{study, k} w[k] · [ −y log σ(z) − (1−y) log(1−σ(z)) ]  /  Σ w        (over the 2 studies of a forward)
+loss = BCE(z_fused) + 0.5·BCE(z_ResNet-head) + 0.5·BCE(z_Swin-head);   backward on loss / 4 (accumulation)</div>
+<p>Labels are <b>soft</b>: a cell can be 0.15 or 0.85, not only 0/1. The gradient with respect to a logit is simply <code>w·(σ(z) − y)/Σw</code>, so the model is pulled toward predicting the label's probability, not toward ±∞. A cell with weight 0 contributes nothing. The normalisation is per forward pass (2 studies). Accumulating 4 passes divided by 4 gives the mean of four 2-study means. The last step of an epoch accumulates only 2 passes (1,762 = 4 × 440 + 2) and is still divided by 4, so it is a half-size step.</p>
+<div class="panel">
+<div class="ctrl">
+<label>soft label y <input type="range" id="lsY" min="0" max="1" step="0.05" value="0.85"><span id="lsYv"></span></label>
+<label>logit z <input type="range" id="lsZ" min="-6" max="6" step="0.05" value="0"><span id="lsZv"></span></label>
+<label>cell weight w <input type="range" id="lsW" min="0" max="1" step="0.05" value="1"><span id="lsWv"></span></label>
+</div>
+<div class="svgbox" id="lsChart"></div>
+<div id="lsOut" class="small"></div>
+</div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section id="s-backward">
+<h2>9. The backward pass</h2>
+<p><code>(loss / 4).backward()</code> runs autograd from the scalar loss back through every recorded operation. Gradients are summed into each parameter's <code>.grad</code> (fp32) across the 4 accumulated forward passes. Two facts shape everything in J1's backward pass:</p>
+<ol>
+<li><b>Several losses reach the same encoder.</b> The ResNet backbone gets gradient from the fused loss (through <code>pr</code> and the fused softmax) <i>and</i> from 0.5 × its own head's loss. The two signals are added at the LayerNorm output <code>hr</code>. The Swin stages 3–4 work the same way through <code>ps</code> and the Swin head.</li>
+<li><b>The frozen Swin stem is a wall.</b> The output of PM2 was produced under <code>no_grad</code>, so it is a constant to autograd. The backward pass stops at the input of stage-3 block 0. No activations of the patch embedding or stages 1–2 were saved, which is a large memory saving at 80×80 resolution.</li>
+</ol>
+<h3 id="s-gradmap">9a. Gradient-flow map</h3>
+<p>Toggle which loss terms are active and which branch is dropped from the fused pool. Each box shows which losses' gradients reach it and with what multiplier. Grey boxes receive nothing.</p>
+<div class="panel">
+<div class="ctrl">
+<label><input type="checkbox" id="gmF" checked> fused BCE (×1)</label>
+<label><input type="checkbox" id="gmR" checked> ResNet-head BCE (×0.5)</label>
+<label><input type="checkbox" id="gmS" checked> Swin-head BCE (×0.5)</label>
+<span class="seg" id="gmDrop"><button data-v="0" class="on">no branch dropout (85%)</button><button data-v="1">ResNet dropped from fused (7.5%)</button><button data-v="2">Swin dropped from fused (7.5%)</button></span>
+</div>
+<div class="svgbox" id="gmBox"></div>
+</div>
+<h3 id="s-bwalk">9b. Backward walk-through, top to bottom</h3>
+<div id="bwalk"></div>
+<div class="callout l"><b>Precision.</b> The forward pass runs under <code>torch.autocast(bfloat16)</code>: convs and matmuls are in bf16, while softmaxes are explicitly in fp32 (<code>.float()</code>). LayerNorm runs in fp32 under autocast, and BCE is in fp32. Parameters and their <code>.grad</code> stay fp32, so the backward kernels compute in bf16 and accumulate into fp32 grads. TF32 is enabled for any remaining fp32 matmuls. bf16 has the same exponent range as fp32, so no loss scaling is needed.</div>
+</section>
+
+<!-- ============================================================ 10 -->
+<section id="s-optim">
+<h2>10. Optimiser and learning-rate schedule</h2>
+<p>One <code>AdamW</code> holds every trainable parameter (52,175,592) in groups with their own learning rate and weight decay. The parameter counts below are computed from the architecture, and they match the profile's "params 53.7M, trainable 52.2M".</p>
+<div class="tablewrap"><table id="grpTable"></table></div>
+<div class="two">
+<div>
+<h4>Layer-wise lr decay inside the Swin branch</h4>
+<div class="svgbox" id="llrdChart"></div>
+<p class="small">17 "units" in depth order (patch embedding, each block, each patch merge, the final norm). Unit <i>i</i> gets 5e-5 × 0.9<sup>16−i</sup>. Units 0–6 are frozen, so their lr is never used. The lowest trained layer (stage-3 block 0) gets 1.94e-5, about 40% of the top. The idea is to change the pretrained lower layers less than the upper ones.</p>
+</div>
+<div>
+<h4>AdamW, the update every parameter gets</h4>
+<div class="mathline">g  = clip(∇θ)                       (global L2 norm ≤ 1.0)
+m ← 0.9·m + 0.1·g ;  v ← 0.999·v + 0.001·g²
+m̂ = m/(1−0.9^t) ;  v̂ = v/(1−0.999^t)
+θ ← θ·(1 − lr·wd) − lr · m̂ / (√v̂ + 1e-8)</div>
+<p>Adam divides by the running RMS of each parameter's own gradient, so the step size of every weight is roughly <i>lr</i> regardless of how large its gradient is. The 0.5 auxiliary weight therefore changes the <i>direction</i> mix between the fused and auxiliary signals, not the step length. Weight decay is decoupled: a pure shrink of 0.05 × lr per step toward zero. Clipping uses <b>one</b> global norm over all 52 M parameters. When it triggers, it shrinks the ResNet, Swin and fusion updates by the same factor.</p>
+</div>
+</div>
+<h4>The schedule</h4>
+<p>441 optimiser steps per epoch (⌈3,524 / 8⌉) × 20 epochs = 8,820 steps. <code>LambdaLR</code> multiplies every group's base lr by a linear warm-up over the first 441 steps, then a cosine from 1 down to a 1% floor. Drag the slider. The dots are the lrs logged at each epoch end in <code>history.json</code>, which confirms the curve.</p>
+<div class="panel">
+<div class="ctrl"><label>optimiser step q <input type="range" id="lrQ" min="0" max="8819" value="0" style="width:340px"></label><span id="lrQv" class="mono"></span></div>
+<div class="svgbox" id="lrChart"></div>
+<div id="lrTable" class="small"></div>
+</div>
+</section>
+
+<!-- ============================================================ 11 -->
+<section id="s-step">
+<h2>11. One optimiser step, end to end</h2>
+<p>Step through what happens between two <code>opt.step()</code> calls. The counters on the right are exact for epoch 1, step 1.</p>
+<div class="panel steps">
+<div><ol id="stepList"></ol>
+<div class="ctrl"><button class="btn" id="stPrev">◀ prev</button><button class="btn" id="stNext">next ▶</button><button class="btn" id="stAuto">autoplay</button></div></div>
+<div id="stDetail"></div>
+</div>
+</section>
+
+<!-- ============================================================ 12 -->
+<section id="s-dyn">
+<h2>12. What happened over 20 epochs</h2>
+<p>About 335 s per training epoch on 1× H100 (~0.095 s per study), and ~2.0 h in total including evaluations. The run was pre-empted after epoch 11 and resumed from <code>recovery.pt</code>, which holds the model, optimiser, scheduler and all RNG states. Validation (825 fold-0 studies, 94 windows / full series at 320, no TTA) was scored at epochs 1, 3, 5, 10, 13 and 15–20. The kill rule (fused val &lt; 0.83 at epoch 5) did not fire (0.872).</p>
+<div class="two">
+<div><h4>Training loss per head</h4><div class="svgbox" id="chLoss"></div></div>
+<div><h4>Validation macro AUC (12 findings, confident cells)</h4><div class="svgbox" id="chVal"></div></div>
+</div>
+<div class="two">
+<div><h4>Validation BCE (fused)</h4><div class="svgbox" id="chBce"></div>
+<p class="small">The validation BCE bottoms out at epoch 10 (0.4815) and then drifts sideways while the training loss keeps falling (0.408 → 0.374). This is mild overfitting in calibration, while the ranking (AUC) still improves slowly.</p></div>
+<div><h4>Fused attention mass on ResNet tokens, per finding</h4><div id="shareHeat"></div>
+<p class="small">Blue = mass on ResNet windows, orange = on Swin tokens (mean over the 825 validation studies). It starts near 0.4–0.45 everywhere and then specialises: ACL and the menisci go to the ResNet, MCL and fracture to the Swin.</p></div>
+</div>
+</section>
+
+<!-- ============================================================ 13 -->
+<section id="s-swa">
+<h2>13. SWA, BN refresh, evaluation</h2>
+<div class="two">
+<div>
+<h4>Stochastic weight averaging (epochs 16–20)</h4>
+<p>At the end of epochs 16, 17, 18, 19 and 20 the full <code>state_dict</code> is saved. The final model is their plain arithmetic mean, for every floating-point tensor: weights, biases, LayerNorm and BN parameters, relative-position tables, gates and embeddings. Integer buffers (BN's <code>num_batches_tracked</code>) are taken from epoch 20. Over these epochs the lr falls from 1.1e-5 to 1e-6 (ResNet backbone), so the five snapshots sit close together in one basin. Averaging moves the weights toward the basin's centre, which usually generalises a little better than any single endpoint. SWA val fused: <b>0.9055</b> (12-target) vs 0.9059 at epoch 20.</p>
+<h4>BN refresh (ResNet only)</h4>
+<p>Averaged weights invalidate the BN running statistics (they belong to no single model). For every BN layer in <code>model.R</code>: <code>reset_running_stats()</code> and <code>momentum = None</code>. Then 256 randomly chosen training studies (seed 2026) are forwarded through the ResNet backbone in <b>train mode</b>, under no_grad, at 384 px, with 16 deterministic evenly spaced windows and no augmentation, 2 studies per batch. With <code>momentum=None</code>, PyTorch keeps an exact cumulative average over all 128 batches. The Swin branch needs no refresh: it has only LayerNorm, which has no running statistics.</p>
+</div>
+<div>
+<h4>Evaluation (validation, gold, and the Kaggle kernel)</h4>
+<ul>
+<li><code>model.eval()</code>: dropout off, drop path off, BN uses the refreshed running stats, no branch dropout.</li>
+<li>ResNet: 94 evenly spaced windows on the <b>centre 320 crop</b> (not resized). Train-time windows were 384 at the same pixel scale, so the CNN sees the same anatomy size but a smaller field.</li>
+<li>Swin: every series, every slice, centre 320 crop, no stride 2.</li>
+<li>Batch of 1 study, bf16 autocast, no TTA. Outputs: fused, ResNet-head and Swin-head probabilities + the ResNet share.</li>
+<li>Kaggle port: fused max |Δp| 0.0064 vs the training-side predictions on 8 parity studies (ResNet in fp16, Swin + fusion in fp32).</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ 14 -->
+<section id="s-results">
+<h2>14. What it learned, and why it failed</h2>
+<div class="cards" id="resCards"></div>
+<div class="tablewrap"><table id="resTable"></table></div>
+<p class="small">AUC on confident validation cells (label ≤ 0.3 or ≥ 0.7, weight &gt; 0), SWA model. "1e" = the standalone ResNet with the same recipe (d40803d0 labels), "B2" = standalone Swin3D, "A" = mean(1e, B2) probabilities, the bar J1 had to beat. Gate = learned gate[R] − gate[S] (log scale).</p>
+<div class="two">
+<div>
+<h4>Gate sweep: is the routing the problem?</h4>
+<div class="svgbox" id="chSweep"></div>
+<p class="small">Shift every study's ResNet-vs-Swin log-odds by <i>d</i>, recompute the fused logit exactly, and score. The learned routing (d = 0) is already at the 10-target optimum. An oracle per-finding gate fit on fold 0 itself reaches only 0.9097, recovering 39% of the gap to avg(lv2, B2). So the problem lies in the <b>features</b>, not the mixing.</p>
+</div>
+<div>
+<h4>Which branch carries which finding (occlusion of the fused head)</h4>
+<div class="tablewrap"><table id="occTable"></table></div>
+<p class="small">AUC change when one series or slot is removed from the fused pool. ACL depends on ResNet sagittal fat-sat windows, MCL on the Swin coronal series, and fracture / contusion / effusion partly on the Swin axial series.</p>
+</div>
+</div>
+<h3>The diagnosis in four sentences</h3>
+<ol>
+<li><b>Branch competition starved the ResNet.</b> Its own head lost 0.008 10-target AUC against the same recipe trained alone (label-v2 r50), concentrated in the findings the gate routed to the Swin (MCL 0.751 vs 0.794, fracture). A linear probe confirms the information is <i>in</i> the windows (window-mean probe MCL 0.750 vs 0.745), but J1's ResNet head no longer <i>pools</i> it well. Its MCL attention spread over 50 effective windows vs 34, with less coronal fat-sat mass (0.25 vs 0.34). Once the fused head took MCL from the Swin side, the ResNet received less MCL-specific gradient. Confound: it also trained 20 epochs instead of 25, at 0.5 aux weight.</li>
+<li><b>The fusion is a mixture, not an interaction.</b> One softmax over a union is a per-finding weighted average of two pooled vectors. No token ever looks at another branch's token, so 2D and 3D evidence are combined but never reconciled.</li>
+<li><b>The fold-0 gain was within noise.</b> Fused − mean of own heads: +0.0013 10-target [−0.0011, +0.0037]. Fused − A: −0.0027. All three pre-registered gates FAILED.</li>
+<li><b>The leaderboard punished it.</b> LB 0.930 (submission 57270107), below label-v2's 0.937 and below its own clear6 fit (0.938). A residual of −0.008 is the opposite of the standalone Swin3D's +0.006 / +0.013. The fusion route (F0, J1, J2) is closed.</li>
+</ol>
+</section>
+
+<!-- ============================================================ A -->
+<section id="s-config">
+<h2>Appendix: the full configuration</h2>
+<pre id="cfgDump"></pre>
+<p class="small">Sources: <code>scripts/joint_r50_swin_runner.py</code> (JointNet, groups, loop, SWA, BN refresh), <code>scripts/coatnet_d96_runner.py</code> (d96 data, <code>prepare</code>, <code>Raptor</code>, scoring), <code>scripts/swin3d_d96n_runner.py</code> (<code>Prep</code>, <code>SwinB</code>, fused window attention, llrd), <code>data/coatnet_d96_fold0/run_joint_j1/</code> (history.json, run_summary.json, audit_j1.txt), <code>joint_j1_xai/analysis.txt</code>, <code>docs/experiment_ledger.md</code> rows J1, J1-sub and J1-XAI.</p>
+</section>
+
+</main>
+</div>
+
+<script>
+"use strict";
+/* ================================================================ utilities */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const fmtI = n => Math.round(n).toLocaleString("en-US");
+const fmtShape = a => "[" + a.join(", ") + "]";
+const fmtM = x => x >= 1e12 ? (x / 1e12).toFixed(2) + " T" : x >= 1e9 ? (x / 1e9).toFixed(2) + " G" : x >= 1e6 ? (x / 1e6).toFixed(1) + " M" : x >= 1e3 ? (x / 1e3).toFixed(1) + " k" : x > 0 ? String(Math.round(x)) : "—";
+const fmtLr = x => x == null ? "—" : x.toExponential(2);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const sigmoid = z => 1 / (1 + Math.exp(-z));
+function mulberry(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function seg(id, cb) {
+  const el = $(id);
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    el.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    cb(b.dataset.v);
+  });
+}
+function setSeg(id, v) { $(id).querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === String(v))); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ================================================================ run data (history.json, audit_j1.txt, analysis.txt) */
+const FIND = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA", "PF OA", "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"];
+const SHORT = ["ACL", "MCL", "Med men", "Lat men", "Med OA", "Lat OA", "PF OA", "Effusion", "Synov", "Baker's", "Contus", "Fract"];
+const HIST = {
+  epoch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+  total: [1.0636, 0.9795, 0.9366, 0.9137, 0.8899, 0.8746, 0.8639, 0.8493, 0.8355, 0.8275, 0.8161, 0.809, 0.7992, 0.7897, 0.7836, 0.7755, 0.7702, 0.766, 0.7636, 0.7616],
+  fused: [0.5275, 0.4849, 0.4619, 0.45, 0.4386, 0.4311, 0.426, 0.4187, 0.412, 0.4084, 0.4023, 0.3987, 0.3939, 0.3885, 0.386, 0.3813, 0.3788, 0.3769, 0.3755, 0.3741],
+  r50: [0.5395, 0.5065, 0.485, 0.4716, 0.4563, 0.4474, 0.4415, 0.4335, 0.4259, 0.4222, 0.4153, 0.4107, 0.405, 0.3996, 0.3945, 0.3906, 0.3863, 0.3839, 0.3822, 0.3816],
+  swin: [0.5327, 0.4828, 0.4645, 0.4558, 0.4463, 0.4396, 0.4343, 0.4277, 0.4211, 0.4161, 0.4122, 0.4099, 0.4056, 0.4028, 0.4008, 0.3977, 0.3967, 0.3942, 0.394, 0.3934],
+  train_s: [355.9, 332.5, 329.5, 332.1, 333.2, 333.2, 331.1, 333.7, 332.5, 336.5, 335.0, 371.0, 338.3, 334.6, 335.6, 339.1, 343.7, 342.7, 335.4, 336.4],
+  lrR: [1e-4, 9.932488e-05, 9.731795e-05, 9.403395e-05, 8.956246e-05, 8.402544e-05, 7.757393e-05, 7.038392e-05, 6.265153e-05, 5.458768e-05, 4.641232e-05, 3.834847e-05, 3.061608e-05, 2.342607e-05, 1.697456e-05, 1.143754e-05, 6.966049e-06, 3.682047e-06, 1.675115e-06, 1e-06]
+};
+const VAL = { // eval epochs: fused, r50 head, swin head, mean of branch heads, val BCE (fused)
+  epoch: [1, 3, 5, 10, 13, 15, 16, 17, 18, 19, 20],
+  fused: [0.7775, 0.8408, 0.8722, 0.8932, 0.9010, 0.9042, 0.9044, 0.9054, 0.9051, 0.9058, 0.9059],
+  r50: [0.7521, 0.8246, 0.8458, 0.8788, 0.8881, 0.8940, 0.8963, 0.8958, 0.8954, 0.8964, 0.8963],
+  swin: [0.7746, 0.8405, 0.8629, 0.8839, 0.8914, 0.8913, 0.8915, 0.8926, 0.8925, 0.8933, 0.8933],
+  mean: [0.7788, 0.8462, 0.8684, 0.8930, 0.9009, 0.9028, 0.9041, 0.9040, 0.9039, 0.9043, 0.9042],
+  bce: [0.5886, 0.5218, 0.5117, 0.4815, 0.4844, 0.4826, 0.4832, 0.4865, 0.4807, 0.4844, 0.4811]
+};
+const SHARE = { // fused attention mass on ResNet tokens, mean over 825 val studies
+  1: [0.347, 0.458, 0.450, 0.444, 0.433, 0.445, 0.425, 0.345, 0.409, 0.395, 0.435, 0.440],
+  3: [0.609, 0.391, 0.707, 0.453, 0.559, 0.440, 0.498, 0.421, 0.454, 0.397, 0.463, 0.341],
+  5: [0.574, 0.356, 0.501, 0.634, 0.447, 0.437, 0.477, 0.407, 0.421, 0.323, 0.420, 0.311],
+  10: [0.563, 0.250, 0.455, 0.583, 0.479, 0.459, 0.575, 0.360, 0.335, 0.205, 0.383, 0.254],
+  13: [0.602, 0.299, 0.495, 0.634, 0.463, 0.510, 0.562, 0.375, 0.377, 0.265, 0.420, 0.269],
+  15: [0.632, 0.304, 0.573, 0.586, 0.517, 0.513, 0.580, 0.372, 0.361, 0.295, 0.453, 0.292],
+  16: [0.607, 0.292, 0.546, 0.611, 0.493, 0.522, 0.586, 0.388, 0.367, 0.325, 0.418, 0.286],
+  17: [0.631, 0.314, 0.586, 0.619, 0.504, 0.517, 0.586, 0.422, 0.386, 0.344, 0.447, 0.328],
+  18: [0.631, 0.301, 0.563, 0.599, 0.510, 0.518, 0.598, 0.427, 0.388, 0.358, 0.441, 0.310],
+  19: [0.637, 0.311, 0.566, 0.589, 0.512, 0.512, 0.600, 0.414, 0.382, 0.357, 0.443, 0.308],
+  20: [0.636, 0.314, 0.577, 0.594, 0.517, 0.516, 0.601, 0.416, 0.383, 0.372, 0.453, 0.312],
+  SWA: [0.633, 0.312, 0.581, 0.606, 0.514, 0.519, 0.593, 0.412, 0.380, 0.360, 0.436, 0.303]
+};
+const RES = { // SWA per-target AUC on confident cells (audit_j1.txt)
+  fused: [0.8981, 0.7830, 0.9741, 0.9309, 0.9122, 0.8626, 0.8938, 0.8775, 0.9722, 0.9193, 0.9217, 0.9207],
+  r50: [0.8977, 0.7506, 0.9736, 0.9337, 0.9079, 0.8550, 0.8871, 0.8641, 0.9651, 0.9125, 0.9036, 0.9113],
+  swin: [0.8634, 0.7838, 0.9686, 0.8964, 0.8999, 0.8452, 0.8589, 0.8736, 0.9730, 0.9149, 0.9216, 0.9135],
+  mean: [0.8901, 0.7768, 0.9757, 0.9354, 0.9099, 0.8578, 0.8868, 0.8765, 0.9730, 0.9220, 0.9223, 0.9250],
+  e1: [0.9078, 0.8035, 0.9733, 0.9327, 0.9053, 0.8638, 0.8886, 0.8695, 0.9682, 0.9073, 0.9149, 0.9096],
+  b2: [0.8545, 0.7982, 0.9674, 0.8938, 0.8939, 0.8409, 0.8517, 0.8714, 0.9723, 0.9116, 0.9204, 0.9171],
+  A: [0.8917, 0.8109, 0.9770, 0.9346, 0.9058, 0.8658, 0.8868, 0.8772, 0.9745, 0.9166, 0.9256, 0.9275],
+  gate: [0.10, -0.36, -0.09, 0.02, -0.21, -0.25, 0.01, -0.08, -0.23, -0.13, -0.15, -0.37],
+  sd: [0.06, 0.06, 0.10, 0.10, 0.07, 0.06, 0.07, 0.05, 0.06, 0.10, 0.10, 0.10]
+};
+const SWEEP = [[-3, 0.05, 0.9561, 0.8953], [-2, 0.12, 0.9617, 0.8998], [-1, 0.26, 0.9683, 0.9055], [-0.5, 0.36, 0.9708, 0.9075], [0, 0.47, 0.9725, 0.9084], [0.5, 0.59, 0.9735, 0.9078], [1, 0.69, 0.9741, 0.9061], [2, 0.85, 0.9740, 0.9012], [3, 0.94, 0.9736, 0.8969]];
+
+/* ================================================================ state */
+const SERIES = ["sag fat-sat", "sag non-FS", "coronal", "axial"];
+const ST = {
+  mode: "train", dir: "fwd", filter: "all", series: 0, paramsOnly: false, expandAll: false, search: "", sel: null,
+  T: [36, 34, 32, 34], present: [true, true, true, true], stride2: [false, false, false, false], drop: [false, false, false, false]
+};
+const SW_LR = i => 5e-5 * Math.pow(0.9, 16 - i);
+
+function seriesT(j, tr) {
+  if (!ST.present[j]) return 0;
+  if (tr) {
+    const kept = [0, 1, 2, 3].filter(i => ST.present[i] && !ST.drop[i]);
+    const keepJ = kept.length ? kept.includes(j) : j === [0, 1, 2, 3].find(i => ST.present[i]);
+    if (!keepJ) return 0;
+    if (ST.stride2[j] && ST.T[j] >= 16) return Math.ceil(ST.T[j] / 2);
+  }
+  return ST.T[j];
+}
+function swinTokens(tr) {
+  let n = 0; for (let j = 0; j < 4; j++) { const T = seriesT(j, tr); if (T) n += Math.ceil(T / 2) * 100; } return n;
+}
+
+/* ================================================================ layer builders */
+const G = { RB: "fused + ½·R-head", RH: "½·R-head only", SB: "fused + ½·S-head", SH: "½·S-head only", FU: "fused only", NO: "— (frozen, no_grad)", DATA: "— (data)", NONE: "— (no parameters)" };
+
+function buildR(rows, tr) {
+  const B = tr ? 2 : 1, K = tr ? 16 : 94, res = tr ? 384 : 320, N = B * K;
+  let H = res, rf = 1, jmp = 1;
+  const add = o => {
+    o.branch = "R"; if (o.trainable === undefined) o.trainable = true; if (o.lr === undefined) o.lr = 1e-4;
+    if (o.wd === undefined) o.wd = 0.05; if (o.grad === undefined) o.grad = G.RB; o.rf = rf; o.jmp = jmp; o.res = res; rows.push(o); return o;
+  };
+  add({ grp: "R.input", grpName: "ResNet input windows", path: "rr.prepare(x, sag, …)", op: tr ? "mirror · affine · gamma/gain · normalise" : "centre 320 crop · normalise", kind: "input_r", inS: [B, K, 3, 384, 384], outS: [N, 3, res, res], params: 0, macs: 0, trainable: false, lr: null, wd: null, grad: G.DATA, pshapes: [] });
+  let g = "R.stem", Ho = Math.floor((H + 6 - 7) / 2) + 1; rf = 7; jmp = 2;
+  add({ grp: g, grpName: "stem: conv 7×7/2 → BN → ReLU → maxpool", path: "R.backbone.conv1", op: "Conv2d 7×7 /2, 3→64", kind: "conv", k: 7, s: 2, cin: 3, cout: 64, inS: [N, 3, H, H], outS: [N, 64, Ho, Ho], params: 9408, macs: N * Ho * Ho * 3 * 64 * 49, pshapes: ["W [64, 3, 7, 7]"], stage: "stem", first: true });
+  H = Ho;
+  add({ grp: g, path: "R.backbone.bn1", op: "BatchNorm2d(64)", kind: "bn", c: 64, inS: [N, 64, H, H], outS: [N, 64, H, H], params: 128, macs: 0, pshapes: ["γ [64]", "β [64]"], stage: "stem" });
+  add({ grp: g, path: "R.backbone.act1", op: "ReLU", kind: "relu", inS: [N, 64, H, H], outS: [N, 64, H, H], params: 0, macs: 0, pshapes: [], stage: "stem", grad: G.RB });
+  Ho = Math.floor((H + 2 - 3) / 2) + 1; rf += 2 * jmp; jmp *= 2;
+  add({ grp: g, path: "R.backbone.maxpool", op: "MaxPool2d 3×3 /2", kind: "maxpool", inS: [N, 64, H, H], outS: [N, 64, Ho, Ho], params: 0, macs: 0, pshapes: [], stage: "stem" });
+  H = Ho;
+  let inp = 64;
+  for (const [li, planes, n, stride] of [[1, 64, 3, 1], [2, 128, 4, 2], [3, 256, 6, 2], [4, 512, 3, 2]]) {
+    for (let b = 0; b < n; b++) {
+      const s = b === 0 ? stride : 1, pre = `R.backbone.layer${li}.${b}`, st = "layer" + li, out = planes * 4, Hin = H;
+      g = pre;
+      const gname = `layer${li}.${b}: bottleneck ${inp}→${planes}→${out}${s > 1 ? ", stride 2" : ""}${b === 0 ? " + downsample" : ""}`;
+      add({ grp: g, grpName: gname, path: pre + ".conv1", op: `Conv2d 1×1, ${inp}→${planes}`, kind: "conv", role: "squeeze", k: 1, s: 1, cin: inp, cout: planes, inS: [N, inp, H, H], outS: [N, planes, H, H], params: inp * planes, macs: N * H * H * inp * planes, pshapes: [`W [${planes}, ${inp}, 1, 1]`], stage: st, li, b });
+      add({ grp: g, path: pre + ".bn1", op: `BatchNorm2d(${planes})`, kind: "bn", c: planes, inS: [N, planes, H, H], outS: [N, planes, H, H], params: 2 * planes, macs: 0, pshapes: [`γ [${planes}]`, `β [${planes}]`], stage: st });
+      add({ grp: g, path: pre + ".act1", op: "ReLU", kind: "relu", inS: [N, planes, H, H], outS: [N, planes, H, H], params: 0, macs: 0, pshapes: [], stage: st });
+      const H2 = Math.floor((H + 2 - 3) / s) + 1; rf += 2 * jmp; jmp *= s;
+      add({ grp: g, path: pre + ".conv2", op: `Conv2d 3×3${s > 1 ? " /2" : ""}, ${planes}→${planes}`, kind: "conv", role: "spatial", k: 3, s, cin: planes, cout: planes, inS: [N, planes, H, H], outS: [N, planes, H2, H2], params: planes * planes * 9, macs: N * H2 * H2 * planes * planes * 9, pshapes: [`W [${planes}, ${planes}, 3, 3]`], stage: st, li, b });
+      H = H2;
+      add({ grp: g, path: pre + ".bn2", op: `BatchNorm2d(${planes})`, kind: "bn", c: planes, inS: [N, planes, H, H], outS: [N, planes, H, H], params: 2 * planes, macs: 0, pshapes: [`γ [${planes}]`, `β [${planes}]`], stage: st });
+      add({ grp: g, path: pre + ".act2", op: "ReLU", kind: "relu", inS: [N, planes, H, H], outS: [N, planes, H, H], params: 0, macs: 0, pshapes: [], stage: st });
+      add({ grp: g, path: pre + ".conv3", op: `Conv2d 1×1, ${planes}→${out}`, kind: "conv", role: "expand", k: 1, s: 1, cin: planes, cout: out, inS: [N, planes, H, H], outS: [N, out, H, H], params: planes * out, macs: N * H * H * planes * out, pshapes: [`W [${out}, ${planes}, 1, 1]`], stage: st, li, b });
+      add({ grp: g, path: pre + ".bn3", op: `BatchNorm2d(${out})`, kind: "bn", c: out, inS: [N, out, H, H], outS: [N, out, H, H], params: 2 * out, macs: 0, pshapes: [`γ [${out}]`, `β [${out}]`], stage: st });
+      if (b === 0) {
+        add({ grp: g, path: pre + ".downsample.0", op: `Conv2d 1×1${s > 1 ? " /2" : ""}, ${inp}→${out} (skip path)`, kind: "conv", role: "skip", k: 1, s, cin: inp, cout: out, inS: [N, inp, Hin, Hin], outS: [N, out, H, H], params: inp * out, macs: N * H * H * inp * out, pshapes: [`W [${out}, ${inp}, 1, 1]`], stage: st, li, b });
+        add({ grp: g, path: pre + ".downsample.1", op: `BatchNorm2d(${out}) (skip path)`, kind: "bn", c: out, inS: [N, out, H, H], outS: [N, out, H, H], params: 2 * out, macs: 0, pshapes: [`γ [${out}]`, `β [${out}]`], stage: st });
+      }
+      add({ grp: g, path: pre + " (x += shortcut)", op: b === 0 ? "residual add (with downsampled skip)" : "residual add (identity skip)", kind: "add", inS: [N, out, H, H], outS: [N, out, H, H], params: 0, macs: 0, pshapes: [], stage: st, grad: G.RB });
+      add({ grp: g, path: pre + ".act3", op: "ReLU", kind: "relu", inS: [N, out, H, H], outS: [N, out, H, H], params: 0, macs: 0, pshapes: [], stage: st });
+      inp = out;
+    }
+  }
+  g = "R.pool";
+  add({ grp: g, grpName: "global average pool → one 2048-d token per window", path: "R.backbone.global_pool", op: "adaptive avg pool + flatten", kind: "gap", inS: [N, 2048, H, H], outS: [N, 2048], params: 0, macs: 0, pshapes: [], stage: "pool", h: H });
+  add({ grp: g, path: "f = backbone(xr).view(b, K, -1)", op: "regroup windows by study", kind: "view", inS: [N, 2048], outS: [B, K, 2048], params: 0, macs: 0, pshapes: [], stage: "pool" });
+  // ResNet head (Raptor)
+  g = "R.head";
+  const hh = o => { o.branch = "H"; o.sub = "R-head"; o.lr = o.lr === undefined ? 1e-3 : o.lr; o.wd = o.wd === undefined ? 0.05 : o.wd; o.trainable = o.trainable === undefined ? true : o.trainable; o.grp = g; rows.push(o); };
+  hh({ grpName: "ResNet head (1e's per-finding attention pooling)", path: "R.norm", op: "LayerNorm(2048)", kind: "ln", c: 2048, inS: [B, K, 2048], outS: [B, K, 2048], params: 4096, macs: 0, pshapes: ["γ [2048]", "β [2048]"], grad: G.RB, note: "Its output hr feeds BOTH the ResNet head (below) and the fusion projection pr, so it receives both gradients." });
+  hh({ path: "R.context(hr, ctx)", op: "identity (Raptor base class)", kind: "identity", inS: [B, K, 2048], outS: [B, K, 2048], params: 0, macs: 0, pshapes: [], grad: G.RB, lr: null, wd: null });
+  hh({ path: "R.att.0", op: "Linear 2048→256", kind: "linear", cin: 2048, cout: 256, inS: [B, K, 2048], outS: [B, K, 256], params: 2048 * 256 + 256, macs: B * K * 2048 * 256, pshapes: ["W [256, 2048]", "b [256]"], grad: G.RH, role: "attmlp" });
+  hh({ path: "R.att.1", op: "Tanh", kind: "tanh", inS: [B, K, 256], outS: [B, K, 256], params: 0, macs: 0, pshapes: [], grad: G.RH });
+  hh({ path: "R.att.2", op: "Dropout(0.2)", kind: "dropout", p: 0.2, inS: [B, K, 256], outS: [B, K, 256], params: 0, macs: 0, pshapes: [], grad: G.RH });
+  hh({ path: "R.att.3", op: "Linear 256→12 (one score per finding)", kind: "linear", cin: 256, cout: 12, inS: [B, K, 256], outS: [B, K, 12], params: 256 * 12 + 12, macs: B * K * 256 * 12, pshapes: ["W [12, 256]", "b [12]"], grad: G.RH, role: "score" });
+  hh({ path: "ar = softmax(·, dim=1)", op: `softmax over the ${K} windows, per finding (fp32)`, kind: "softmax", over: `${K} windows`, inS: [B, K, 12], outS: [B, K, 12], params: 0, macs: 0, pshapes: [], grad: G.RH });
+  hh({ path: "einsum('bkn,bkf->bnf', ar, hr)", op: "attention-weighted mean window, per finding", kind: "pool", inS: [B, K, 12], outS: [B, 12, 2048], params: 0, macs: B * K * 12 * 2048, pshapes: [], grad: G.RH, d: 2048 });
+  hh({ path: "(pooled · R.clsW).sum(-1) + R.clsb", op: "per-finding linear classifier → z_R", kind: "cls", d: 2048, inS: [B, 12, 2048], outS: [B, 12], params: 12 * 2048 + 12, macs: B * 12 * 2048, pshapes: ["clsW [12, 2048]", "clsb [12]"], grad: G.RH });
+}
+
+const SW_ST = [
+  { name: "stage 1", path: "S.shared.0", C: 96, h: 3, n: 2, H: 80, unit0: 1, frozen: true, g0: 0 },
+  { pm: true, name: "patch merge 1", path: "S.shared.1", C: 96, H: 80, unit: 3, frozen: true },
+  { name: "stage 2", path: "S.shared.2", C: 192, h: 6, n: 2, H: 40, unit0: 4, frozen: true, g0: 2 },
+  { pm: true, name: "patch merge 2", path: "S.shared.3", C: 192, H: 40, unit: 6, frozen: true },
+  { name: "stage 3", path: "S.shared.4", C: 384, h: 12, n: 6, H: 20, unit0: 7, frozen: false, g0: 4 },
+  { pm: true, name: "patch merge 3", path: "S.branch.0.0", C: 384, H: 20, unit: 13, frozen: false },
+  { name: "stage 4", path: "S.branch.0.1", C: 768, h: 24, n: 2, H: 10, unit0: 14, frozen: false, g0: 10 }
+];
+function winGeom(Tq, H, shifted) {
+  const ws = [8, 7, 7], sh = shifted ? [4, 3, 3] : [0, 0, 0], size = [Tq, H, H];
+  for (let d = 0; d < 3; d++) if (size[d] <= ws[d]) { ws[d] = size[d]; sh[d] = 0; }
+  const Tp = Math.ceil(Tq / ws[0]) * ws[0], Hp = Math.ceil(H / ws[1]) * ws[1];
+  const nW = (Tp / ws[0]) * (Hp / ws[1]) * (Hp / ws[2]), n = ws[0] * ws[1] * ws[2];
+  return { ws, sh, Tp, Hp, nW, n, shiftedEff: sh.some(x => x > 0) };
+}
+function buildS(rows, tr, j) {
+  const T = seriesT(j, tr), out = { macs: 0, tokens: 0 };
+  if (!T) return out;
+  const Tq = Math.ceil(T / 2), Tpad = Tq * 2;
+  const add = o => { o.branch = "S"; o.series = j; if (rows) rows.push(o); out.macs += o.macs || 0; return o; };
+  const fz = (o, unit) => { o.trainable = false; o.lr = null; o.wd = null; o.grad = G.NO; o.unit = unit; o.frozen = true; return o; };
+  let g = "S.input";
+  add({ grp: g, grpName: `Swin input: ${SERIES[j]} series, T = ${T}`, path: "s.Prep(vol, slot, …)", op: tr ? "stride-2? · per-series affine · gamma/gain · bias/blur/noise · 3-ch Kinetics norm" : "centre 320 crop · 3-ch Kinetics norm", kind: "input_s", inS: [T, 384, 384], outS: [1, 3, T, 320, 320], params: 0, macs: 0, pshapes: [], trainable: false, lr: null, wd: null, grad: G.DATA, T });
+  g = "S.pe";
+  add(fz({ grp: g, grpName: "patch embedding (2 slices × 4×4 px → one 96-d token)", path: "S.patch_embed.proj", op: "Conv3d k=(2,4,4) s=(2,4,4), 3→96" + (Tpad !== T ? " (T padded to even)" : ""), kind: "conv3d", inS: [1, 3, Tpad, 320, 320], outS: [1, 96, Tq, 80, 80], params: 9312, macs: Tq * 80 * 80 * 96 * 96, pshapes: ["W [96, 3, 2, 4, 4]", "b [96]"] }, 0));
+  add(fz({ grp: g, path: "S.patch_embed (permute)", op: "channels last: [B,C,T,H,W] → [B,T,H,W,C]", kind: "permute", inS: [1, 96, Tq, 80, 80], outS: [1, Tq, 80, 80, 96], params: 0, macs: 0, pshapes: [] }, 0));
+  add(fz({ grp: g, path: "S.patch_embed.norm", op: "LayerNorm(96)", kind: "ln", c: 96, inS: [1, Tq, 80, 80, 96], outS: [1, Tq, 80, 80, 96], params: 192, macs: 0, pshapes: ["γ [96]", "β [96]"] }, 0));
+  add(fz({ grp: g, path: "S.pos_drop", op: "Dropout(p=0) — identity", kind: "identity", inS: [1, Tq, 80, 80, 96], outS: [1, Tq, 80, 80, 96], params: 0, macs: 0, pshapes: [] }, 0));
+  for (const stg of SW_ST) {
+    const C = stg.C, H = stg.H;
+    if (stg.pm) {
+      g = stg.path; const o = { grp: g, grpName: `${stg.name}: 2×2 merge in H, W (${H}→${H / 2}), channels ${C}→${2 * C}${stg.frozen ? " · frozen" : ""}` };
+      const tune = (x) => { if (stg.frozen) return fz(x, stg.unit); x.trainable = true; x.lr = SW_LR(stg.unit); x.unit = stg.unit; x.grad = G.SB; return x; };
+      add(tune(Object.assign({}, o, { path: stg.path + " (gather 2×2)", op: "concat x[0::2,0::2], x[1::2,0::2], x[0::2,1::2], x[1::2,1::2]", kind: "pm_gather", inS: [1, Tq, H, H, C], outS: [1, Tq, H / 2, H / 2, 4 * C], params: 0, macs: 0, pshapes: [], wd: null, C })));
+      add(tune({ grp: g, path: stg.path + ".norm", op: `LayerNorm(${4 * C})`, kind: "ln", c: 4 * C, inS: [1, Tq, H / 2, H / 2, 4 * C], outS: [1, Tq, H / 2, H / 2, 4 * C], params: 8 * C, macs: 0, pshapes: [`γ [${4 * C}]`, `β [${4 * C}]`], wd: 0, C }));
+      add(tune({ grp: g, path: stg.path + ".reduction", op: `Linear ${4 * C}→${2 * C}, no bias`, kind: "linear", role: "pm", cin: 4 * C, cout: 2 * C, inS: [1, Tq, H / 2, H / 2, 4 * C], outS: [1, Tq, H / 2, H / 2, 2 * C], params: 8 * C * C, macs: Tq * (H / 2) * (H / 2) * 8 * C * C, pshapes: [`W [${2 * C}, ${4 * C}]`], wd: 0.05, C }));
+      if (stg.name === "patch merge 2") {
+      // frozen → trainable boundary marker
+      add({ grp: "S.wall", grpName: "no_grad wall: everything above is a constant to autograd", path: "with torch.no_grad(): … (end)", op: "frozen output enters the graph as a leaf without grad", kind: "wall", inS: [1, Tq, 20, 20, 384], outS: [1, Tq, 20, 20, 384], params: 0, macs: 0, pshapes: [], trainable: false, lr: null, wd: null, grad: G.NO });
+    }
+      continue;
+    }
+    for (let b = 0; b < stg.n; b++) {
+      const unit = stg.unit0 + b, gi = stg.g0 + b, shifted = b % 2 === 1, wg = winGeom(Tq, H, shifted);
+      const dp = stg.frozen || !tr ? 0 : 0.25 * gi / 11, pre = `${stg.path}.${b}`, h = stg.h;
+      g = pre;
+      const tune = (x) => { x.stageName = stg.name; x.C = C; x.heads = h; x.wg = wg; x.blockIdx = gi; x.dp = dp; x.H = H; x.Tq = Tq; if (stg.frozen) return fz(x, unit); x.trainable = true; x.lr = SW_LR(unit); x.unit = unit; x.grad = G.SB; return x; };
+      const tok = [1, Tq, H, H, C];
+      const gname = `${stg.name} · block ${b} (${shifted && wg.shiftedEff ? "shifted window" : "regular window"}, ${h} heads, C ${C})${stg.frozen ? " · frozen" : ` · lr ${fmtLr(SW_LR(unit))}`}`;
+      add(tune({ grp: g, grpName: gname, path: pre + ".norm1", op: `LayerNorm(${C})`, kind: "ln", c: C, inS: tok, outS: tok, params: 2 * C, macs: 0, pshapes: [`γ [${C}]`, `β [${C}]`], wd: 0 }));
+      add(tune({ grp: g, path: pre + ".attn (pad · roll · partition)", op: `pad to [${wg.Tp},${wg.Hp},${wg.Hp}]${wg.shiftedEff ? ` · roll −(${wg.sh.join(",")})` : ""} · ${wg.nW} windows of ${wg.ws.join("×")}`, kind: "partition", inS: tok, outS: [wg.nW, wg.n, C], params: 0, macs: 0, pshapes: [], wd: null }));
+      add(tune({ grp: g, path: pre + ".attn.qkv", op: `Linear ${C}→${3 * C} → q, k, v (${h} heads × 32)`, kind: "linear", role: "qkv", cin: C, cout: 3 * C, inS: [wg.nW, wg.n, C], outS: [3, wg.nW, h, wg.n, 32], params: 3 * C * C + 3 * C, macs: wg.nW * wg.n * C * 3 * C, pshapes: [`W [${3 * C}, ${C}]`, `b [${3 * C}]`], wd: 0.05 }));
+      add(tune({ grp: g, path: pre + ".attn (SDPA)", op: `softmax(QKᵀ/√32 + rel-pos bias${wg.shiftedEff ? " + shift mask" : ""}) · V`, kind: "attn", inS: [wg.nW, h, wg.n, 32], outS: [wg.nW, h, wg.n, 32], params: 2535 * h, macs: 2 * wg.nW * h * wg.n * wg.n * 32, pshapes: [`relative_position_bias_table [2535, ${h}]`], wd: 0 }));
+      add(tune({ grp: g, path: pre + ".attn.proj", op: `Linear ${C}→${C} (mix heads)`, kind: "linear", role: "proj", cin: C, cout: C, inS: [wg.nW, wg.n, C], outS: [wg.nW, wg.n, C], params: C * C + C, macs: wg.nW * wg.n * C * C, pshapes: [`W [${C}, ${C}]`, `b [${C}]`], wd: 0.05 }));
+      add(tune({ grp: g, path: pre + ".attn (reverse · roll back · crop)", op: "windows → grid" + (wg.shiftedEff ? " · roll +shift" : "") + " · drop padding", kind: "unpartition", inS: [wg.nW, wg.n, C], outS: tok, params: 0, macs: 0, pshapes: [], wd: null }));
+      add(tune({ grp: g, path: pre + ".stochastic_depth + x", op: `x + DropPath(p=${dp.toFixed(3)})(attn)`, kind: "droppath", inS: tok, outS: tok, params: 0, macs: 0, pshapes: [], wd: null }));
+      add(tune({ grp: g, path: pre + ".norm2", op: `LayerNorm(${C})`, kind: "ln", c: C, inS: tok, outS: tok, params: 2 * C, macs: 0, pshapes: [`γ [${C}]`, `β [${C}]`], wd: 0 }));
+      add(tune({ grp: g, path: pre + ".mlp.0", op: `Linear ${C}→${4 * C}`, kind: "linear", role: "fc1", cin: C, cout: 4 * C, inS: tok, outS: [1, Tq, H, H, 4 * C], params: 4 * C * C + 4 * C, macs: Tq * H * H * 4 * C * C, pshapes: [`W [${4 * C}, ${C}]`, `b [${4 * C}]`], wd: 0.05 }));
+      add(tune({ grp: g, path: pre + ".mlp.1 (+ .mlp.2 Dropout p=0)", op: "GELU", kind: "gelu", inS: [1, Tq, H, H, 4 * C], outS: [1, Tq, H, H, 4 * C], params: 0, macs: 0, pshapes: [], wd: null }));
+      add(tune({ grp: g, path: pre + ".mlp.3 (+ .mlp.4 Dropout p=0)", op: `Linear ${4 * C}→${C}`, kind: "linear", role: "fc2", cin: 4 * C, cout: C, inS: [1, Tq, H, H, 4 * C], outS: tok, params: 4 * C * C + C, macs: Tq * H * H * 4 * C * C, pshapes: [`W [${C}, ${4 * C}]`, `b [${C}]`], wd: 0.05 }));
+      add(tune({ grp: g, path: pre + ".stochastic_depth + x", op: `x + DropPath(p=${dp.toFixed(3)})(mlp)`, kind: "droppath", inS: tok, outS: tok, params: 0, macs: 0, pshapes: [], wd: null }));
+    }
+  }
+  g = "S.out";
+  add({ grp: g, grpName: "final norm + flatten → this series' tokens", path: "S.branch.0.2", op: "LayerNorm(768) (pretrained final norm)", kind: "ln", c: 768, inS: [1, Tq, 10, 10, 768], outS: [1, Tq, 10, 10, 768], params: 1536, macs: 0, pshapes: ["γ [768]", "β [768]"], trainable: true, lr: SW_LR(16), unit: 16, wd: 0, grad: G.SB });
+  add({ grp: g, path: "h.flatten(0, 3)", op: "every stage-4 cell becomes a token (pool = tokens)", kind: "flatten", inS: [1, Tq, 10, 10, 768], outS: [Tq * 100, 768], params: 0, macs: 0, pshapes: [], trainable: true, lr: null, wd: null, grad: G.SB });
+  out.tokens = Tq * 100;
+  return out;
+}
+
+function buildHeads(rows, tr) {
+  const B = tr ? 2 : 1, K = tr ? 16 : 94, N = swinTokens(tr), U = K + N;
+  let g = "S.head";
+  const hh = (o, grad) => { o.branch = "H"; o.sub = g === "S.head" ? "S-head" : "fusion"; o.grp = g; if (o.lr === undefined) o.lr = 1e-3; if (o.wd === undefined) o.wd = 0.05; if (o.trainable === undefined) o.trainable = true; o.grad = grad; rows.push(o); };
+  hh({ grpName: `Swin head (B2's attention pooling over all ${fmtI(N)} tokens of the study)`, path: "torch.cat(toks)", op: "all series' tokens of one study", kind: "concat", inS: ["Σ series"], outS: [N, 768], params: 0, macs: 0, pshapes: [], lr: null, wd: null }, G.SB);
+  hh({ path: "S.norm", op: "LayerNorm(768)", kind: "ln", c: 768, inS: [N, 768], outS: [N, 768], params: 1536, macs: 0, pshapes: ["γ [768]", "β [768]"], note: "In the head group (lr 1e-3, wd 0.05 even on γ/β)." }, G.SB);
+  hh({ path: "+ S.series(ids)", op: "Embedding(4, 768): which series a token came from", kind: "embed", inS: [N], outS: [N, 768], params: 3072, macs: 0, pshapes: ["weight [4, 768]"] }, G.SB);
+  hh({ path: "S.att.0", op: "Linear 768→256", kind: "linear", role: "attmlp", cin: 768, cout: 256, inS: [N, 768], outS: [N, 256], params: 768 * 256 + 256, macs: N * 768 * 256, pshapes: ["W [256, 768]", "b [256]"] }, G.SH);
+  hh({ path: "S.att.1", op: "Tanh", kind: "tanh", inS: [N, 256], outS: [N, 256], params: 0, macs: 0, pshapes: [] }, G.SH);
+  hh({ path: "S.att.2", op: "Dropout(0.2)", kind: "dropout", p: 0.2, inS: [N, 256], outS: [N, 256], params: 0, macs: 0, pshapes: [] }, G.SH);
+  hh({ path: "S.att.3", op: "Linear 256→12", kind: "linear", role: "score", cin: 256, cout: 12, inS: [N, 256], outS: [N, 12], params: 256 * 12 + 12, macs: N * 256 * 12, pshapes: ["W [12, 256]", "b [12]"] }, G.SH);
+  hh({ path: "a_s = softmax(·, dim=0)", op: `softmax over the ${fmtI(N)} tokens, per finding (fp32)`, kind: "softmax", over: `${fmtI(N)} tokens`, inS: [N, 12], outS: [N, 12], params: 0, macs: 0, pshapes: [] }, G.SH);
+  hh({ path: "einsum('nk,nf->kf', a_s, hs)", op: "attention-weighted mean token, per finding", kind: "pool", d: 768, inS: [N, 12], outS: [12, 768], params: 0, macs: N * 12 * 768, pshapes: [] }, G.SH);
+  hh({ path: "(pooled · S.clsW).sum(-1) + S.clsb", op: "per-finding linear classifier → z_S", kind: "cls", d: 768, inS: [12, 768], outS: [12], params: 12 * 768 + 12, macs: 12 * 768, pshapes: ["clsW [12, 768]", "clsb [12]"] }, G.SH);
+  g = "F";
+  hh({ grpName: `Fusion head (per study: ${K} ResNet + ${fmtI(N)} Swin tokens)`, path: "self.pr[0]", op: "Linear 2048→512 (ResNet tokens → common space)", kind: "linear", role: "projR", cin: 2048, cout: 512, inS: [K, 2048], outS: [K, 512], params: 2048 * 512 + 512, macs: K * 2048 * 512, pshapes: ["W [512, 2048]", "b [512]"] }, G.FU);
+  hh({ path: "self.pr[1]", op: "LayerNorm(512)", kind: "ln", c: 512, inS: [K, 512], outS: [K, 512], params: 1024, macs: 0, pshapes: ["γ [512]", "β [512]"] }, G.FU);
+  hh({ path: "ur = … + self.kind[0]", op: "add the 'I am a ResNet token' vector", kind: "kind", inS: [K, 512], outS: [K, 512], params: 512, macs: 0, pshapes: ["kind[0] [512] (of kind [2, 512])"] }, G.FU);
+  hh({ path: "self.ps[0]", op: "Linear 768→512 (Swin tokens → common space)", kind: "linear", role: "projS", cin: 768, cout: 512, inS: [N, 768], outS: [N, 512], params: 768 * 512 + 512, macs: N * 768 * 512, pshapes: ["W [512, 768]", "b [512]"] }, G.FU);
+  hh({ path: "self.ps[1]", op: "LayerNorm(512)", kind: "ln", c: 512, inS: [N, 512], outS: [N, 512], params: 1024, macs: 0, pshapes: ["γ [512]", "β [512]"] }, G.FU);
+  hh({ path: "us = … + self.kind[1]", op: "add the 'I am a Swin token' vector", kind: "kind", inS: [N, 512], outS: [N, 512], params: 512, macs: 0, pshapes: ["kind[1] [512]"] }, G.FU);
+  if (tr) hh({ path: "drop[i] (branch dropout)", op: "p 0.85 keep both · 0.075 drop ResNet · 0.075 drop Swin (fused pool only)", kind: "bdrop", inS: ["—"], outS: ["—"], params: 0, macs: 0, pshapes: [], lr: null, wd: null }, G.FU);
+  hh({ path: "u = torch.cat(parts)", op: "union of the kept token sets", kind: "concat2", inS: [K, 512], outS: [U, 512], params: 0, macs: 0, pshapes: [], lr: null, wd: null, K, N }, G.FU);
+  hh({ path: "prior = gate[k] − log(len(q))", op: `per branch: gate − log(${K}) for ResNet, gate − log(${fmtI(N)}) for Swin`, kind: "prior", inS: ["gate [2, 12]"], outS: [U, 12], params: 24, macs: 0, pshapes: ["gate [2, 12] (init 0)"], K, N }, G.FU);
+  hh({ path: "self.att[0]", op: "Linear 512→256", kind: "linear", role: "attmlp", cin: 512, cout: 256, inS: [U, 512], outS: [U, 256], params: 512 * 256 + 256, macs: U * 512 * 256, pshapes: ["W [256, 512]", "b [256]"] }, G.FU);
+  hh({ path: "self.att[1]", op: "Tanh", kind: "tanh", inS: [U, 256], outS: [U, 256], params: 0, macs: 0, pshapes: [] }, G.FU);
+  hh({ path: "self.att[2]", op: "Dropout(0.2)", kind: "dropout", p: 0.2, inS: [U, 256], outS: [U, 256], params: 0, macs: 0, pshapes: [] }, G.FU);
+  hh({ path: "self.att[3]", op: "Linear 256→12", kind: "linear", role: "score", cin: 256, cout: 12, inS: [U, 256], outS: [U, 12], params: 256 * 12 + 12, macs: U * 256 * 12, pshapes: ["W [12, 256]", "b [12]"] }, G.FU);
+  hh({ path: "a = softmax(att(u) + prior, dim=0)", op: `ONE softmax over all ${fmtI(U)} tokens, per finding (fp32)`, kind: "fsoftmax", inS: [U, 12], outS: [U, 12], params: 0, macs: 0, pshapes: [], K, N }, G.FU);
+  hh({ path: "einsum('nk,nf->kf', a, u)", op: "attention-weighted mean of the union", kind: "pool", d: 512, inS: [U, 12], outS: [12, 512], params: 0, macs: U * 12 * 512, pshapes: [] }, G.FU);
+  hh({ path: "(pooled · self.clsW).sum(-1) + self.clsb", op: "per-finding linear classifier → z_fused", kind: "cls", d: 512, inS: [12, 512], outS: [12], params: 12 * 512 + 12, macs: 12 * 512, pshapes: ["clsW [12, 512]", "clsb [12]"] }, G.FU);
+  hh({ path: "share = a[:K].sum(0)", op: "attention mass on ResNet tokens (logged, not in the loss)", kind: "share", inS: [U, 12], outS: [12], params: 0, macs: 0, pshapes: [], lr: null, wd: null }, "— (diagnostic)");
+  if (!tr) return;
+  g = "L";
+  const ll = o => { o.branch = "L"; o.grp = "L"; o.lr = null; o.wd = null; o.trainable = false; rows.push(o); };
+  ll({ grpName: "loss (training only)", path: "bce(lf, y, w)", op: "fused BCE, weight 1", kind: "bce", which: "fused", inS: [B, 12], outS: ["scalar"], params: 0, macs: 0, pshapes: [], grad: "∂L/∂z = w(σ(z)−y)/Σw" });
+  ll({ path: "bce(lr_, y, w)", op: "ResNet-head BCE, weight 0.5", kind: "bce", which: "R", inS: [B, 12], outS: ["scalar"], params: 0, macs: 0, pshapes: [], grad: "× 0.5" });
+  ll({ path: "bce(ls, y, w)", op: "Swin-head BCE, weight 0.5", kind: "bce", which: "S", inS: [B, 12], outS: ["scalar"], params: 0, macs: 0, pshapes: [], grad: "× 0.5" });
+  ll({ path: "(loss / 4).backward()", op: "sum, ÷ accumulation 4, start backward", kind: "total", inS: ["3 scalars"], outS: ["scalar"], params: 0, macs: 0, pshapes: [], grad: "seed ∂ = 1/4" });
+}
+
+function buildRows() {
+  const tr = ST.mode === "train", rows = [];
+  buildR(rows, tr);
+  buildS(rows, tr, ST.series);
+  buildHeads(rows, tr);
+  rows.forEach((r, i) => r.idx = i);
+  return rows;
+}
+
+/* ================================================================ explanations */
+const STAGE_NOTE = {
+  stem: "Stem (stride 2 → 4). 64 ImageNet filters of 7×7 px (~2.5 mm) look at the 3-slice stack: edges, blobs and, because the channels are neighbouring slices, through-plane change. Max-pooling keeps the strongest response in each 3×3 neighbourhood.",
+  layer1: "Layer 1 (stride 4, 96×96 at 384 px). Low-level texture: cortical bone edges, fluid/fat boundaries, cartilage surfaces. Receptive field grows from 35 to 99 px (~13–36 mm).",
+  layer2: "Layer 2 (stride 8, 48×48). Mid-level parts: meniscus wedges, ligament fibre bundles, cartilage thickness, marrow signal patches.",
+  layer3: "Layer 3 (stride 16, 24×24). 6 blocks hold the most parameters of the network after layer 4: structures in context (a condyle with its cartilage, a ligament along its course, fluid in a recess).",
+  layer4: "Layer 4 (stride 32, 12×12 at 384 px / 10×10 at 320). 2048 channels of high-level, task-tuned detectors. Each cell's receptive field covers the whole window. GAP then turns 'where' into 'how much'.",
+  pool: "Pooling: from a spatial map to one vector per window."
+};
+function swinStageNote(r) {
+  const s = r.stageName || "", tokPx = { "stage 1": 4, "stage 2": 8, "stage 3": 16, "stage 4": 32 }[s];
+  if (!tokPx) return "";
+  const mm = (tokPx * 140 / 384).toFixed(1), win = r.wg ? r.wg.ws : [8, 7, 7];
+  return `${s}: each token stands for 2 slices × ${tokPx}×${tokPx} px (≈ ${mm} mm). One attention window spans ${win[0] * 2} slices × ${win[1] * tokPx} px (≈ ${(win[1] * tokPx * 140 / 384).toFixed(0)} mm) in-plane.` +
+    (s === "stage 4" ? " With a 10×10 grid padded to 14×14, there are only 2×2 windows per slice group, so each stage-4 token sees about a quarter of the knee directly and the rest via the shifted block." : "") +
+    (r.frozen ? " Frozen: Kinetics-400 video features, used as is." : ` Trained at lr ${fmtLr(r.lr)} (llrd unit ${r.unit}).`);
+}
+
+function explain(r) {
+  const tr = ST.mode === "train";
+  const E = { fwd: "", bwd: "", int: "" };
+  const frozenB = "Frozen: this runs inside <code>torch.no_grad()</code>, so no graph is recorded and no activations are kept. Backward never reaches this layer, and its parameters have <code>requires_grad=False</code> and are not in the optimiser.";
+  switch (r.kind) {
+    case "input_r":
+      E.fwd = tr ? `uint8 windows <code>[2 studies, 16, 3, 384, 384]</code> → GPU → flattened to 32 images. <b>Mirror</b> (p 0.5 per study): sagittal windows reverse their 3 slice channels (c+1, c, c−1), the others flip width. ÷255. <b>One affine per study</b> (rotation U(±10°), scale U(±10%), shift U(±6%)), repeated over its 16 windows: <code>affine_grid</code> + bilinear <code>grid_sample</code>, zeros outside. Gamma <i>x</i><sup>exp(U(±0.25))</sup>, gain ×U(0.9–1.1), clamp [0,1]. ImageNet mean/std per channel. <code>channels_last</code> memory format (faster convs on tensor cores).`
+        : `94 windows of the study, no augmentation: the centre 320×320 of each 384 slice (no resize, so the pixel scale is unchanged), ImageNet normalisation.`;
+      E.bwd = "Nothing. The input does not require grad, so autograd skips ∂L/∂image at the first conv and only computes ∂L/∂W there.";
+      E.int = "Stacking slices c−1, c, c+1 as RGB is the whole '2.5D' idea. ImageNet filters that weight colour channels differently become detectors of change <i>between neighbouring slices</i>, which is the only 3D signal this branch gets.";
+      break;
+    case "conv":
+      E.fwd = `Each output value = Σ over ${r.cin} input channels × ${r.k}×${r.k} positions of weight × input (no bias, BN follows): <code>y[o,i,j] = Σ_c,u,v W[o,c,u,v] · x[c, ${r.s}i+u−p, ${r.s}j+v−p]</code>. That is ${fmtI(r.cin * r.k * r.k)} multiply-adds per output, × ${fmtI(r.outS.slice(1).reduce((a, b) => a * b, 1))} outputs per window, × ${r.outS[0]} windows.` +
+        ({ squeeze: " Role: squeeze channels 4× before the expensive 3×3.", spatial: r.s > 1 ? " Role: the only spatial mixing in the block, with stride 2 halving the grid (torchvision-style ResNet-50 'v1.5')." : " Role: the only spatial mixing in the block (3×3 neighbourhood).", expand: " Role: expand back 4× to the residual width.", skip: " Role: make the shortcut match the new shape (channels ×2 or ×4, grid ÷2)." }[r.role] || "");
+      E.bwd = `<b>Weight gradient</b> <code>∂L/∂W[o,c,u,v] = Σ_windows Σ_i,j ∂L/∂y[o,i,j] · x[c, …]</code>. Every one of the ${r.outS[0]} windows and every output position votes on every weight, so the update is an average over 2 knees × 16 windows × ${r.outS[2]}² positions.` +
+        (r.first ? " ∂L/∂x is not computed (the image needs no gradient)." : ` <b>Input gradient</b> <code>∂L/∂x</code> = transposed convolution of ∂L/∂y with W (each input pixel collects the gradients of every output that used it${r.s > 1 ? "; stride 2 means the gradient map is first upsampled with zeros" : ""}).`) +
+        ` Shape passed down: ${fmtShape(r.inS)}.`;
+      E.int = STAGE_NOTE[r.stage] || "";
+      break;
+    case "bn":
+      E.fwd = tr ? `Per channel c: μ, σ² over all ${r.inS[0]} windows × ${r.inS[2]}×${r.inS[3]} positions of this forward pass; <code>x̂ = (x−μ)/√(σ²+1e-5)</code>; <code>y = γ·x̂ + β</code>. Running averages are updated with momentum 0.1 (and later thrown away by the BN refresh).`
+        : "Eval: <code>y = γ(x − μ_run)/√(σ²_run + 1e-5) + β</code>, using the running statistics re-estimated after SWA (section 13). This is a fixed per-channel affine map.";
+      E.bwd = "Train-mode BN backward: <code>∂L/∂γ = Σ ∂L/∂y · x̂</code>, <code>∂L/∂β = Σ ∂L/∂y</code>, and <code>∂L/∂x = γ/σ · (∂L/∂y − mean(∂L/∂y) − x̂ · mean(∂L/∂y · x̂))</code>. The two mean terms mean that every window's gradient depends on every other window in the batch, because μ and σ were shared. Weight decay 0.05 also applies to γ and β (the ResNet backbone group has no exclusions).";
+      E.int = "BN keeps every channel at a standard scale, so the 1e-4 learning rate means the same thing in every layer. Here, the batch statistics mix 2 knees and 5 sequence types per forward pass.";
+      break;
+    case "relu":
+      E.fwd = "<code>y = max(0, x)</code>, elementwise.";
+      E.bwd = "<code>∂L/∂x = ∂L/∂y · [x &gt; 0]</code>. Only units that fired pass gradient down. A unit that is off for every window in the batch learns nothing this step.";
+      E.int = "The non-linearity. Without it, the whole stack of convs would collapse into one linear filter.";
+      break;
+    case "maxpool":
+      E.fwd = "Each output = the maximum of a 3×3 neighbourhood (stride 2, padding 1).";
+      E.bwd = "The gradient goes only to the input position that was the maximum (the argmax is remembered from the forward pass). All other positions get 0.";
+      E.int = STAGE_NOTE.stem;
+      break;
+    case "add":
+      E.fwd = `<code>out = bn3(conv3(…)) + shortcut</code>, where the shortcut is ${r.op.includes("identity") ? "the block input itself" : "downsample(block input)"}.`;
+      E.bwd = "Addition copies ∂L/∂out unchanged to <i>both</i> inputs. The skip path carries the gradient straight down to earlier layers without passing through any weights. This 'gradient highway' is why 50-layer networks train at all.";
+      E.int = "The block only has to learn a correction F(x) to its input. At the start of fine-tuning, the pretrained corrections already make sense, so the network moves only as far as the knee task requires.";
+      break;
+    case "gap":
+      E.fwd = `Mean over the ${r.h}×${r.h} grid for each of the 2048 channels → one vector per window. In training the grid is 12×12 (384 px), in evaluation 10×10 (320 px): GAP makes the CNN indifferent to input size.`;
+      E.bwd = `Each of the ${r.h * r.h} positions receives ∂L/∂vector / ${r.h * r.h}. The gradient is spread evenly, so the CNN learns from every position of a window that the head paid attention to.`;
+      E.int = "Information about <i>where</i> in the slice something is gets discarded here. What remains is how strongly each of 2048 learned detectors fired anywhere in the window.";
+      break;
+    case "view":
+      E.fwd = "The 32 window vectors are reshaped into [2 studies, 16 windows, 2048]. This is the first point where windows know which knee they belong to.";
+      E.bwd = "A reshape: the gradient is reshaped back. No arithmetic.";
+      E.int = "From here on, a study is a bag of 16 (or 94) tokens.";
+      break;
+    case "ln":
+      E.fwd = `Per token (not per batch): mean and variance over its ${r.c} channels, normalise, then <code>γ ⊙ x̂ + β</code>. Under bf16 autocast, layer_norm runs in fp32.` + (r.note ? " " + r.note : "");
+      E.bwd = "<code>∂L/∂x = (γ ⊙ ∂L/∂y − mean(γ ⊙ ∂L/∂y) − x̂ · mean(γ ⊙ ∂L/∂y · x̂)) / σ</code>, computed within each token. Tokens do not interact (unlike BN). γ and β get the sums over tokens." + (r.wd === 0 ? " No weight decay on γ, β (Swin backbone rule)." : r.lr ? " Weight decay 0.05 on γ, β (head / fusion groups have no exclusion list)." : "");
+      E.int = r.branch === "S" ? swinStageNote(r) : "Puts every token on the same scale before attention scores and projections, so that the attention MLP's tanh does not saturate.";
+      if (r.frozen) E.bwd = frozenB;
+      break;
+    case "identity":
+      E.fwd = r.path.startsWith("R.context") ? "Identity: <code>Raptor.context(h, ctx) = h</code>. Variants such as Exp 2a put a transformer across windows here, but J1 uses plain 1e, so the window position/slot information in <code>ctx</code> is unused." : "Dropout with p = 0: identity.";
+      E.bwd = "Gradient passes through unchanged.";
+      E.int = "Windows are processed as an unordered bag.";
+      if (r.frozen) E.bwd = frozenB;
+      break;
+    case "linear":
+      E.fwd = `<code>y = x Wᵀ + b</code>: every output channel is a learned weighted sum of the ${r.cin} input channels, applied to each token independently. ` +
+        ({ qkv: `Splits into queries, keys and values, ${r.heads} heads × 32 dims each. In a window, each token asks a question (q), advertises what it contains (k), and offers content (v).`, proj: "Mixes the heads' outputs back into one C-dim vector per token.", fc1: "MLP expansion 4×: per-token feature computation (no mixing between tokens).", fc2: "MLP contraction back to C.", pm: "Patch-merging reduction: compresses 4 neighbours' features (4C) into 2C.", attmlp: "First layer of the attention MLP: projects each token to 256 'relevance features'.", score: "One attention score per finding for each token: 12 different opinions on how relevant this token is.", projR: "Projects ResNet's 2048-d window vectors into the 512-d fusion space.", projS: "Projects Swin's 768-d tokens into the same 512-d fusion space." }[r.role] || "");
+      E.bwd = `<code>∂L/∂W = Σ_tokens ∂L/∂yᵀ · x</code> (outer products summed over all ${r.inS.length > 1 ? fmtI(r.inS.slice(0, -1).reduce((a, b) => a * b, 1)) : ""} rows), <code>∂L/∂b = Σ ∂L/∂y</code>, <code>∂L/∂x = ∂L/∂y · W</code>.` +
+        (r.role === "score" ? " ∂L/∂y here is the softmax backward's output: positive for tokens that should get less attention, negative for those that should get more." : "") +
+        (r.role === "projR" ? " This is the fused loss's only door into the ResNet: its ∂L/∂x is added to the ResNet head's gradient at <code>hr</code>." : "") +
+        (r.role === "projS" ? " The fused loss's only door into the Swin encoder: its ∂L/∂x is added at <code>hs</code> to the Swin head's gradient." : "");
+      E.int = r.branch === "S" ? swinStageNote(r) : r.sub === "fusion" ? "Fusion parameters receive only the fused loss's gradient, at lr 1e-3." : "";
+      if (r.frozen) E.bwd = frozenB;
+      break;
+    case "tanh":
+      E.fwd = "<code>tanh</code>, elementwise, squashes to (−1, 1).";
+      E.bwd = "<code>∂L/∂x = ∂L/∂y · (1 − tanh²(x))</code>. Saturated units (|x| large) pass almost nothing.";
+      E.int = "A bounded non-linearity in the attention MLP keeps scores in a sane range. This is the 'Raptor' attention design (the gated-attention MIL style without the gate).";
+      break;
+    case "dropout":
+      E.fwd = tr ? "Training: each of the 256 features is zeroed with p 0.2, and the survivors are scaled ×1.25." : "Evaluation: identity.";
+      E.bwd = tr ? "Same mask: zeroed units get no gradient, survivors get ×1.25." : "—";
+      E.int = "Regularises <i>where to look</i>: attention scores cannot rely on any single feature.";
+      break;
+    case "softmax":
+      E.fwd = `For each finding k separately: <code>a[n,k] = exp(e[n,k]) / Σ_m exp(e[m,k])</code> over the ${r.over}. Computed in fp32. The 12 columns are 12 independent probability distributions over the tokens.`;
+      E.bwd = "<code>∂L/∂e[n,k] = a[n,k] · (∂L/∂a[n,k] − Σ_m a[m,k] ∂L/∂a[m,k])</code>. Combined with the pooling, this becomes <code>a[n,k]·(v[n,k] − z̄_k)·∂L/∂z_k</code>: a token gains attention if its own vote agrees with the label better than the current average does. Try it in the lab, section 6a.";
+      E.int = "This is where the head 'decides where to look', separately for each finding.";
+      break;
+    case "pool":
+      E.fwd = `<code>pooled[k] = Σ_n a[n,k] · h_n</code>: for each finding, the attention-weighted mean of the ${r.d}-d tokens.`;
+      E.bwd = "<code>∂L/∂h_n = Σ_k a[n,k] · ∂L/∂pooled[k]</code>: a token gets gradient in proportion to how much attention it received, summed over findings. <code>∂L/∂a[n,k] = h_n · ∂L/∂pooled[k]</code> = that token's vote (scaled by ∂L/∂z_k).";
+      E.int = "Tokens with near-zero attention for every finding receive almost no gradient: the encoder learns only from the regions the heads look at.";
+      break;
+    case "cls":
+      E.fwd = `<code>z_k = pooled[k] · clsW[k] + clsb[k]</code>: one ${r.d}-d dot product per finding. Equivalent to <code>z_k = Σ_n a[n,k] · (h_n · clsW[k]) + b</code>, a weighted average of per-token votes.`;
+      E.bwd = "<code>∂L/∂clsW[k] = ∂L/∂z_k · pooled[k]</code>, <code>∂L/∂clsb[k] = ∂L/∂z_k</code>, <code>∂L/∂pooled[k] = ∂L/∂z_k · clsW[k]</code>. ∂L/∂z_k arrives from the BCE: <code>w(σ(z)−y)/Σw</code> (× 0.5 for branch heads).";
+      E.int = r.sub === "fusion" ? "This produces the fused logits, the model's prediction." : `These logits get their own BCE (weight 0.5). They are deep supervision that keeps the ${r.sub === "R-head" ? "ResNet" : "Swin"} branch learning on its own.`;
+      break;
+    case "input_s":
+      E.fwd = tr ? `${SERIES[r.series]}: uint8 [${r.T}, 384, 384] → ÷255 → (series dropout p 0.1, one kept) → (stride 2 p 0.25 if ≥ 16 slices) → mirror (per study: sagittal flips slice order, others flip width) → <b>its own</b> affine draw, warped straight into the 320 crop at native scale → gamma/gain → bias field (p 0.3) → blur or sharpen (p 0.2 each) → noise (p 0.2) → clamp → copy to 3 channels → Kinetics mean/std → [1, 3, T, 320, 320].`
+        : `${SERIES[r.series]}: centre 320 crop of every slice, 3-channel copy, Kinetics normalisation. No other change.`;
+      E.bwd = "No gradient (data).";
+      E.int = "To the video model, depth is time: neighbouring slices are neighbouring frames.";
+      break;
+    case "conv3d":
+      E.fwd = `A strided 3D conv with kernel = stride = (2, 4, 4): it cuts the volume into non-overlapping 2-slice × 4×4-px bricks and maps each brick's 96 numbers (3 ch × 2 × 4 × 4) to 96 features. Depth ${r.inS[2]} → ${r.outS[2]} tokens (pairs of slices), 320 → 80 in-plane.`;
+      E.bwd = frozenB;
+      E.int = "The only place where depth is ever downsampled. Every later Swin token is a pair of adjacent slices.";
+      break;
+    case "permute":
+      E.fwd = "Reorders the tensor to channels-last, the layout torchvision's Swin blocks expect.";
+      E.bwd = frozenB; E.int = ""; break;
+    case "partition":
+      E.fwd = `Zero-pads the token grid [${r.Tq}, ${r.H}, ${r.H}] up to [${r.wg.Tp}, ${r.wg.Hp}, ${r.wg.Hp}]${r.wg.shiftedEff ? `, rolls it by −(${r.wg.sh.join(", ")}) (cyclic shift), ` : ", "}then cuts it into ${r.wg.nW} windows of ${r.wg.ws.join("×")} = ${r.wg.n} tokens. Windows become the batch dimension: attention happens only inside each window.` + (r.wg.ws[0] < 8 ? ` The depth window shrank to ${r.wg.ws[0]} because T′ = ${r.Tq} ≤ 8 (and the depth shift is off).` : "");
+      E.bwd = r.frozen ? frozenB : "Pure index shuffling: the gradient is un-partitioned, rolled back and cropped (gradients at padding positions are dropped). No arithmetic.";
+      E.int = swinStageNote(r) + " See the window explorer (5a).";
+      break;
+    case "attn":
+      E.fwd = `Per window and head: <code>S = QKᵀ/√32 + B[Δ]${r.wg.shiftedEff ? " + M" : ""}</code> (${r.wg.n}×${r.wg.n} scores), <code>A = softmax(S)</code> row-wise, <code>out = A·V</code>. B[Δ] = the learned relative-position bias for each pair's 3D offset (from a [2535, ${r.heads}] table).` + (r.wg.shiftedEff ? " M = −100 between tokens that came from different regions after the cyclic roll, so they cannot attend to each other." : "") + ` One fused <code>F.scaled_dot_product_attention</code> kernel (the J1/B2 replacement of torchvision's version, numerically equivalent). ${fmtI(r.wg.nW * r.heads)} attention maps of ${r.wg.n}×${r.wg.n} for this series.`;
+      E.bwd = r.frozen ? frozenB : "<code>∂V = Aᵀ·∂out</code>; <code>∂A = ∂out·Vᵀ</code>; <code>∂S = A ⊙ (∂A − rowsum(∂A ⊙ A))</code>; <code>∂Q = ∂S·K/√32</code>, <code>∂K = ∂Sᵀ·Q/√32</code>. The bias table gets <code>Σ ∂S</code> over every query/key pair (in every window, head-wise) that shares the same offset Δ. The mask is a constant and gets nothing. The fused kernel recomputes A in the backward pass instead of storing it.";
+      E.int = swinStageNote(r) + (r.frozen ? "" : ` Drop-path for this block: p ${r.dp.toFixed(3)}.`);
+      break;
+    case "unpartition":
+      E.fwd = "Windows go back to the padded grid" + (r.wg.shiftedEff ? ", the roll is undone (+shift)," : "") + " and the padding is cropped away.";
+      E.bwd = r.frozen ? frozenB : "Inverse index shuffle of the gradient (padding positions receive zero gradient).";
+      E.int = ""; break;
+    case "droppath":
+      E.fwd = tr && r.dp > 0 ? `Stochastic depth: with probability ${r.dp.toFixed(3)} the whole residual branch is zeroed for this sample, otherwise it is scaled by 1/(1−p) = ${(1 / (1 - r.dp)).toFixed(3)}. The batch is a single series here, so the entire series skips this sub-layer. Then <code>x ← x + branch</code>.` : r.frozen ? "Frozen modules are kept in eval mode, so DropPath is off: <code>x ← x + branch</code>." : "Evaluation: <code>x ← x + branch</code> (no dropping).";
+      E.bwd = r.frozen ? frozenB : "Addition copies the gradient to the skip path unchanged. The branch path gets it × the same mask/scale (0 if dropped, so then none of this sub-layer's weights learn from this series).";
+      E.int = "Randomly shortening the network regularises the deepest blocks most (p rises to 0.25 in the last block).";
+      break;
+    case "gelu":
+      E.fwd = "<code>GELU(x) = x · Φ(x)</code>, a smooth ReLU.";
+      E.bwd = r.frozen ? frozenB : "<code>∂L/∂x = ∂L/∂y · (Φ(x) + x·φ(x))</code>, smooth: small negative inputs still pass a little gradient.";
+      E.int = ""; break;
+    case "pm_gather":
+      E.fwd = `Takes each 2×2 group of tokens in (H, W) and concatenates their ${r.C}-d vectors into one ${4 * r.C}-d vector. Depth is untouched. A 4× space-to-depth.`;
+      E.bwd = r.frozen ? frozenB : "The 4C gradient is split into 4 slices of C and scattered back to the 4 source tokens.";
+      E.int = "Builds the pyramid: fewer, richer tokens, so the next stage's 7×7 window covers twice the anatomy.";
+      break;
+    case "wall":
+      E.fwd = "Stage 3 block 0 receives the output of PM2 from inside the <code>no_grad</code> block. To autograd it is a plain tensor with no history.";
+      E.bwd = "<b>The backward pass stops here.</b> Stage-3 block 0 computes gradients for its own weights but does not need ∂L/∂input, so autograd skips it. Nothing below (1.54 M parameters, the 80×80 and 40×40 grids) is touched or stored.";
+      E.int = "This frozen part is why J1 fits in 14.5 GiB: the high-resolution stages hold the most activations, and none of them are kept.";
+      break;
+    case "flatten":
+      E.fwd = `All ${r.outS[0]} cells of the [${r.inS[1]}, 10, 10] stage-4 grid become separate tokens (B2's "pool = tokens"; B1 averaged over space instead). Spatial position is not encoded explicitly from here on, only through what the features contain.`;
+      E.bwd = "Reshape back.";
+      E.int = "Each token: 2 slices × 32×32 px (≈ 11.7 mm), but its features have mixed in context from across the whole knee through 12 attention layers.";
+      break;
+    case "concat":
+      E.fwd = "Tokens of all series of the study are concatenated into one bag (series encoded one by one with batch 1, because depths differ).";
+      E.bwd = "The gradient is split back per series and flows into each series' encoder pass separately. The encoder weights are shared, so their gradients add up.";
+      E.int = ""; break;
+    case "embed":
+      E.fwd = "Adds a learned 768-d vector per series type (sag FS, sag non-FS, coronal, axial) to every token from that series.";
+      E.bwd = "Row j of the table gets the sum of ∂L/∂h over all tokens of series j.";
+      E.int = "With a single shared Swin branch, this embedding is how the head knows which plane a token came from.";
+      break;
+    case "kind":
+      E.fwd = "Adds one learned 512-d vector shared by every token of that branch (initialised N(0, 0.02²)).";
+      E.bwd = "∂kind[b] = Σ of ∂L/∂u over all tokens of branch b.";
+      E.int = "Lets the attention MLP and classifier treat ResNet and Swin tokens differently even after projection into the same space.";
+      break;
+    case "bdrop":
+      E.fwd = "For each study: <code>random() ≥ 0.15</code> → keep both; otherwise drop branch 1 (ResNet) or 2 (Swin) at random, but only from the fused pool. Both branch heads still run. If the study has no Swin series, ResNet tokens are always kept.";
+      E.bwd = "A dropped branch gets no fused gradient for that study, only 0.5 × its own head's gradient. See the toggle in 9a.";
+      E.int = "Meant to force the fused head to cope with either branch alone, so it does not collapse onto one.";
+      break;
+    case "concat2":
+      E.fwd = `u = [ResNet tokens; Swin tokens] = [${r.K} + ${fmtI(r.N)}, 512] when both are kept.`;
+      E.bwd = "The gradient is split back into the ResNet part (→ pr → hr → backbone) and the Swin part (→ ps → hs → Swin).";
+      E.int = ""; break;
+    case "prior":
+      E.fwd = `prior[n,k] = gate[branch, k] − log(count). With log(${r.K}) = ${Math.log(r.K).toFixed(2)} and log(${fmtI(r.N)}) = ${Math.log(Math.max(r.N, 1)).toFixed(2)}, each branch's total softmax mass becomes <code>exp(gate)·mean(exp(score))</code>, independent of how many tokens it has.`;
+      E.bwd = "Only <code>gate</code> has a gradient: <code>∂L/∂gate[R,k] = Σ_{n∈R} ∂L/∂e[n,k] = m_R·m_S·(v̄_R − v̄_S)·∂L/∂z_k</code>, the branch-mass product times the difference in mass-weighted mean votes. ∂gate[S] is exactly the negative. The gate moves toward whichever branch's average vote better matches the label.";
+      E.int = "Without it, the 16 ResNet windows would start with ~0.3% of the attention against ~6,000 Swin tokens, and their share would jump when evaluation uses 94 windows.";
+      break;
+    case "fsoftmax":
+      E.fwd = `<code>a = softmax(att(u) + prior)</code> over all tokens of both branches, per finding. Because it is one softmax, <code>a[n] = m_branch · softmax_within_branch[n]</code>: a mixture of the two branches' pooled vectors with weights m_R + m_S = 1.`;
+      E.bwd = "As every softmax: <code>∂e[n,k] = a[n,k](v[n,k] − z̄_k)∂L/∂z_k</code>. Tokens of both branches compete for one unit of mass, which is the mechanism behind the 'branch competition' (section 14).";
+      E.int = "It looks like cross-branch attention, but no token ever reads another token. The fused head is a per-finding gated average.";
+      break;
+    case "share":
+      E.fwd = "Σ of the attention on the first K (ResNet) rows, per finding. Logged per epoch (the heat-map in section 12).";
+      E.bwd = "Not part of the loss."; E.int = ""; break;
+    case "bce":
+      E.fwd = `<code>Σ w·BCE(z, y) / Σ w</code> over the 2 studies × 12 findings of this forward pass, in fp32. Soft labels y ∈ [0, 1]; cells with w = 0 are ignored.`;
+      E.bwd = `<code>∂/∂z = w·(σ(z) − y)/Σw</code>${r.which === "fused" ? "" : " × 0.5"} × ¼ (accumulation). Section 8 lets you play with it.`;
+      E.int = r.which === "fused" ? "The main objective." : "Deep supervision for one branch.";
+      break;
+    case "total":
+      E.fwd = "loss = fused + 0.5·(ResNet + Swin); the running averages logged per epoch are these three parts.";
+      E.bwd = "<code>(loss/4).backward()</code> seeds the graph with 1/4 and walks every recorded op in reverse topological order, adding into <code>.grad</code>. After 4 forward passes: clip → AdamW step → scheduler step → zero_grad.";
+      E.int = ""; break;
+  }
+  return E;
+}
+
+/* ================================================================ explorer */
+let ROWS = [], EXP = new Set(), visRows = [];
+const DEFAULT_OPEN = new Set(["R.input", "R.stem", "R.backbone.layer1.0", "R.backbone.layer2.0", "R.pool", "R.head", "S.input", "S.pe", "S.shared.0.0", "S.shared.0.1", "S.shared.1", "S.wall", "S.shared.4.0", "S.shared.4.1", "S.branch.0.0", "S.out", "S.head", "F", "L"]);
+DEFAULT_OPEN.forEach(g => EXP.add(g));
+
+function rowVisible(r) {
+  if (ST.filter !== "all" && r.branch !== ST.filter && !(ST.filter === "H" && r.branch === "H")) return false;
+  if (ST.paramsOnly && !r.params) return false;
+  if (ST.search) { const q = ST.search.toLowerCase(); if (!(r.path.toLowerCase().includes(q) || r.op.toLowerCase().includes(q) || (r.grp || "").toLowerCase().includes(q))) return false; }
+  return true;
+}
+function gradCell(r) {
+  if (!r.trainable && r.grad === G.NO) return `<span class="tag Z">frozen</span>`;
+  return esc(r.grad || "");
+}
+function renderExplorer() {
+  ROWS = buildRows();
+  const rows = ST.dir === "fwd" ? ROWS : ROWS.slice().reverse();
+  const t = $("#xtable");
+  const fw = ST.dir === "fwd";
+  let h = fw ? `<tr><th>#</th><th>module / code</th><th>operation</th><th>input → output</th><th class="n">params</th><th class="n">MACs</th><th class="n">lr (peak)</th><th>∂ from</th></tr>`
+    : `<tr><th>#</th><th>module / code</th><th>operation</th><th>∂ arrives (= output shape) → ∂ passed down</th><th>param grads</th><th>∂ from</th></tr>`;
+  visRows = [];
+  const groups = []; let cur = null;
+  for (const r of rows) { if (!rowVisible(r)) continue; if (!cur || cur.g !== r.grp) { cur = { g: r.grp, rows: [] }; groups.push(cur); } cur.rows.push(r); }
+  const forceOpen = ST.expandAll || !!ST.search;
+  for (const gr of groups) {
+    const r0 = gr.rows.find(x => x.grpName) || ROWS.find(x => x.grp === gr.g && x.grpName) || gr.rows[0];
+    const open = forceOpen || EXP.has(gr.g);
+    const p = gr.rows.reduce((a, x) => a + (x.params || 0), 0), m = gr.rows.reduce((a, x) => a + (x.macs || 0), 0);
+    const tagc = r0.frozen ? "Z" : r0.branch;
+    h += `<tr class="grp" data-g="${esc(gr.g)}"><td colspan="${fw ? 8 : 6}">${open ? "▾" : "▸"} <span class="tag ${tagc}">${{ R: "ResNet", S: "Swin", H: r0.sub || "head", L: "loss" }[r0.branch]}</span> ${esc(r0.grpName || gr.g)} <span class="small">· ${gr.rows.length} ops${p ? " · " + fmtI(p) + " params" : ""}${m ? " · " + fmtM(m) + "MAC" : ""}</span></td></tr>`;
+    if (!open) continue;
+    for (const r of gr.rows) {
+      visRows.push(r);
+      const sel = ST.sel === r.idx ? " sel" : "", fz = r.frozen ? " frozen" : "";
+      if (fw) h += `<tr class="row${sel}${fz}" data-i="${r.idx}"><td class="n">${r.idx + 1}</td><td class="path">${esc(r.path)}</td><td>${esc(r.op)}</td><td class="shape">${fmtShape(r.inS)} → ${fmtShape(r.outS)}</td><td class="n">${r.params ? fmtI(r.params) : ""}</td><td class="n">${r.macs ? fmtM(r.macs) : ""}</td><td class="n">${r.lr && r.params ? fmtLr(r.lr) : ""}</td><td>${gradCell(r)}</td></tr>`;
+      else {
+        const stop = r.frozen ? "—" : (r.kind === "input_r" || r.kind === "input_s" || r.first) ? "not needed (input)" : r.kind === "wall" ? "STOP" : fmtShape(r.inS);
+        h += `<tr class="row${sel}${fz}" data-i="${r.idx}"><td class="n">${ROWS.length - r.idx}</td><td class="path">${esc(r.path)}</td><td>${esc(r.op)}</td><td class="shape">${r.frozen ? "— (no graph)" : fmtShape(r.outS) + " → " + stop}</td><td class="shape">${r.frozen ? "" : esc((r.pshapes || []).map(s => "∂" + s).join(", "))}</td><td>${gradCell(r)}</td></tr>`;
+      }
+    }
+  }
+  t.innerHTML = h;
+  // summary
+  const tr = ST.mode === "train";
+  const rM = ROWS.filter(r => r.branch === "R").reduce((a, r) => a + r.macs, 0);
+  let sM = 0; for (let j = 0; j < 4; j++) sM += buildS(null, tr, j).macs;
+  const hM = ROWS.filter(r => r.branch === "H").reduce((a, r) => a + r.macs, 0);
+  const sThis = ROWS.filter(r => r.branch === "S").reduce((a, r) => a + r.macs, 0);
+  const N = swinTokens(tr);
+  $("#xCount").textContent = `${ROWS.length} rows for this configuration`;
+  $("#xSummary").innerHTML = `<b>${tr ? "Training forward (2 studies)" : "Evaluation (1 study)"}.</b> ResNet: ${tr ? 32 : 94} windows at ${tr ? 384 : 320} px → <b>${fmtM(rM)}MAC</b>. Swin: the table shows the <b>${SERIES[ST.series]}</b> series (T = ${seriesT(ST.series, tr) || "absent"}, ${fmtM(sThis)}MAC). All series of one study: ${fmtM(sM)}MAC, ${fmtI(N)} tokens${tr ? " (×2 studies per forward)" : ""}. Heads + fusion: ${fmtM(hM)}MAC. ` +
+    `Backward costs about 2× the forward for trained layers (∂input + ∂weight). The frozen Swin part costs forward only. MAC = multiply-accumulate. Rows inside the head/fusion groups are shown per study.`;
+  if (ST.sel != null && ROWS[ST.sel]) showDetail(ROWS[ST.sel]);
+}
+function showDetail(r) {
+  const E = explain(r);
+  const tagc = r.frozen ? "Z" : r.branch;
+  const lrs = r.lr && r.params ? `${fmtLr(r.lr)} peak${r.unit != null ? ` (Swin unit ${r.unit}: 5e-5 × 0.9^${16 - r.unit})` : ""}` : "—";
+  const wd = r.wd == null || !r.params ? "—" : r.wd === 0 ? "0 (excluded)" : String(r.wd);
+  const fw = `<div class="fwd"><b class="h">Forward</b>${E.fwd}</div>`, bw = `<div class="bwd"><b class="h">Backward</b>${E.bwd}</div>`;
+  $("#xDetail").innerHTML = `<h3><span class="tag ${tagc}">${{ R: "ResNet", S: "Swin", H: r.sub || "head", L: "loss" }[r.branch]}</span> <span class="mono">${esc(r.path)}</span></h3>
+  <div class="kv">
+    <div>operation</div><div>${esc(r.op)}</div>
+    <div>input</div><div class="mono">${fmtShape(r.inS)}</div>
+    <div>output</div><div class="mono">${fmtShape(r.outS)}</div>
+    <div>parameters</div><div>${r.params ? fmtI(r.params) + " · " + esc(r.pshapes.join(", ")) : "none"}</div>
+    <div>compute</div><div>${r.macs ? fmtM(r.macs) + "MAC this pass" : "negligible / memory-bound"}</div>
+    <div>trainable</div><div>${r.frozen ? '<span class="tag Z">frozen</span>' : r.params ? "yes" : "—"}</div>
+    <div>learning rate</div><div>${lrs}</div>
+    <div>weight decay</div><div>${wd}</div>
+    <div>gradient from</div><div>${esc(r.grad || "—")}</div>
+    ${r.branch === "R" && r.rf > 1 ? `<div>receptive field</div><div>${r.rf} px (${(r.rf * 140 / 384).toFixed(0)} mm), stride ${r.jmp}</div>` : ""}
+    ${r.wg ? `<div>windows</div><div>T′=${r.Tq}, grid ${r.H}×${r.H} → padded [${r.wg.Tp}, ${r.wg.Hp}, ${r.wg.Hp}], window ${r.wg.ws.join("×")}${r.wg.shiftedEff ? ", shift " + r.wg.sh.join("/") : ""}, ${r.wg.nW} windows × ${r.wg.n} tokens</div>` : ""}
+  </div>
+  ${ST.dir === "fwd" ? fw + bw : bw + fw}
+  ${E.int ? `<div class="int"><b class="h">Intuition</b>${E.int}</div>` : ""}`;
+}
+function initExplorer() {
+  seg("#xMode", v => { ST.mode = v; ST.sel = null; renderExplorer(); });
+  seg("#xDir", v => { ST.dir = v; renderExplorer(); });
+  seg("#xFilter", v => { ST.filter = v; renderExplorer(); });
+  const sel = $("#xSeries"); sel.innerHTML = SERIES.map((s, j) => `<option value="${j}">${s}</option>`).join("");
+  sel.onchange = () => { ST.series = +sel.value; renderExplorer(); };
+  $("#xParamsOnly").onchange = e => { ST.paramsOnly = e.target.checked; renderExplorer(); };
+  $("#xExpand").onchange = e => { ST.expandAll = e.target.checked; renderExplorer(); };
+  $("#xSearch").oninput = e => { ST.search = e.target.value.trim(); renderExplorer(); };
+  $("#xtable").addEventListener("click", e => {
+    const g = e.target.closest("tr.grp");
+    if (g) { const k = g.dataset.g; EXP.has(k) ? EXP.delete(k) : EXP.add(k); renderExplorer(); return; }
+    const tr = e.target.closest("tr.row"); if (!tr) return;
+    ST.sel = +tr.dataset.i; $$("#xtable tr.row").forEach(x => x.classList.toggle("sel", x === tr)); showDetail(ROWS[ST.sel]);
+  });
+  let timer = null;
+  $("#xPlay").onclick = () => {
+    if (timer) { clearInterval(timer); timer = null; $("#xPlay").textContent = "▶ play"; return; }
+    $("#xPlay").textContent = "■ stop";
+    let k = Math.max(0, visRows.findIndex(r => r.idx === ST.sel));
+    const tick = () => {
+      if (k >= visRows.length) { clearInterval(timer); timer = null; $("#xPlay").textContent = "▶ play"; return; }
+      const r = visRows[k++]; ST.sel = r.idx;
+      const el = $(`#xtable tr.row[data-i="${r.idx}"]`);
+      $$("#xtable tr.row.sel").forEach(x => x.classList.remove("sel"));
+      if (el) { el.classList.add("sel"); const w = el.closest(".tablewrap"); w.scrollTop = el.offsetTop - w.clientHeight / 2; }
+      showDetail(r);
+    };
+    tick(); timer = setInterval(tick, +$("#xSpeed").value);
+    $("#xSpeed").oninput = () => { if (timer) { clearInterval(timer); timer = setInterval(tick, +$("#xSpeed").value); } };
+  };
+}
+/* ================================================================ charts */
+const tipEl = () => $("#tip");
+function showTip(e, html) { const t = tipEl(); t.innerHTML = html; t.style.display = "block"; t.style.left = Math.min(e.clientX + 14, innerWidth - 330) + "px"; t.style.top = (e.clientY + 14) + "px"; }
+function hideTip() { tipEl().style.display = "none"; }
+function lineChart(el, o) {
+  const W = o.w || 560, H = o.h || 260, m = { l: 58, r: 14, t: 14, b: 38 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const ty = o.ylog ? v => Math.log10(v) : v => v, y0 = ty(o.ymin), y1 = ty(o.ymax);
+  const X = x => m.l + (x - o.xmin) / (o.xmax - o.xmin) * iw, Y = y => m.t + ih - (ty(y) - y0) / (y1 - y0) * ih;
+  const fy = o.fmtY || (v => v.toFixed(3)), fx = o.fmtX || (v => v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="font-size:11px">`;
+  for (const b of o.bands || []) s += `<rect x="${X(b.x0)}" y="${m.t}" width="${X(b.x1) - X(b.x0)}" height="${ih}" style="fill:var(--f-soft)"/><text x="${(X(b.x0) + X(b.x1)) / 2}" y="${m.t + 12}" text-anchor="middle" style="fill:var(--f)">${b.label}</text>`;
+  for (const v of o.yticks || []) s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/><text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end" style="fill:var(--muted)">${fy(v)}</text>`;
+  for (const v of o.xticks || []) s += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t + ih}" y2="${m.t + ih + 4}" style="stroke:var(--muted)"/><text x="${X(v)}" y="${m.t + ih + 16}" text-anchor="middle" style="fill:var(--muted)">${fx(v)}</text>`;
+  s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${m.t + ih}" y2="${m.t + ih}" style="stroke:var(--muted)"/><line x1="${m.l}" x2="${m.l}" y1="${m.t}" y2="${m.t + ih}" style="stroke:var(--muted)"/>`;
+  if (o.xlabel) s += `<text x="${m.l + iw / 2}" y="${H - 4}" text-anchor="middle" style="fill:var(--muted)">${o.xlabel}</text>`;
+  if (o.ylabel) s += `<text transform="translate(12 ${m.t + ih / 2}) rotate(-90)" text-anchor="middle" style="fill:var(--muted)">${o.ylabel}</text>`;
+  for (const h of o.hlines || []) s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${Y(h.y)}" y2="${Y(h.y)}" style="stroke:${h.color};stroke-dasharray:4 3"/><text x="${m.l + iw - 4}" y="${Y(h.y) - 4}" text-anchor="end" style="fill:${h.color}">${h.label}</text>`;
+  const cid = "cp" + (++lineChart.n);
+  s += `<clipPath id="${cid}"><rect x="${m.l}" y="${m.t - 6}" width="${iw + 6}" height="${ih + 12}"/></clipPath><g clip-path="url(#${cid})">`;
+  for (const se of o.series) {
+    const d = se.pts.filter(p => p[1] != null).map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
+    if (!se.noline) s += `<path d="${d}" style="fill:none;stroke:${se.color};stroke-width:${se.width || 2};${se.dash ? "stroke-dasharray:" + se.dash : ""}"/>`;
+    if (se.dots) for (const p of se.pts) if (p[1] != null) s += `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="${se.r || 3}" style="fill:${se.color}"/>`;
+  }
+  s += `</g><line class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" style="stroke:var(--ink);stroke-width:1;opacity:${o.cursor != null ? 0.7 : 0}" transform="translate(${o.cursor != null ? X(o.cursor) : 0} 0)"/>`;
+  s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" style="fill:transparent"/></svg>`;
+  if (o.legend !== false) s = `<div class="legend">${o.series.filter(x => x.name).map(x => `<span><i style="background:${x.color}"></i>${x.name}</span>`).join("")}</div>` + s;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg");
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W;
+    if (px < m.l || px > m.l + iw) { hideTip(); return; }
+    const xv = o.xmin + (px - m.l) / iw * (o.xmax - o.xmin);
+    let html = "", bestX = null;
+    for (const se of o.series) {
+      if (!se.name) continue;
+      let best = null; for (const p of se.pts) if (p[1] != null && (best == null || Math.abs(p[0] - xv) < Math.abs(best[0] - xv))) best = p;
+      if (best) { html += `<span style="color:${se.color}">■</span> ${se.name}: <b>${fy(best[1])}</b><br>`; bestX = best[0]; }
+    }
+    if (o.tipX) html = o.tipX(bestX) + "<br>" + html; else html = `${o.xname || "x"} ${fx(bestX)}<br>` + html;
+    svg.querySelector(".cur").setAttribute("transform", `translate(${X(bestX)} 0)`); svg.querySelector(".cur").style.opacity = 0.5;
+    showTip(e, html);
+  });
+  svg.addEventListener("mouseleave", () => { hideTip(); if (o.cursor == null) svg.querySelector(".cur").style.opacity = 0; });
+  return { X, Y };
+}
+
+lineChart.n = 0;
+/* ================================================================ hero */
+function initHero() {
+  const cards = [["parameters", "53.7 M", "52.2 M trainable · 1.54 M frozen"], ["data", "3,524 / 825", "training / fold-0 validation studies"], ["schedule", "20 × 441", "epochs × optimiser steps (8 studies each)"], ["compute", "~2.0 h", "1× H100, bf16, peak 14.5 GiB"], ["fold 0 (SWA)", "0.9725 / 0.9084", "fused head, clear6 / 10-target"], ["public LB", "0.930", "vs label-v2 single 0.937 · all gates FAIL"]];
+  $("#heroCards").innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="d">${c[2]}</div></div>`).join("");
+}
+
+/* ================================================================ network map (also used for the gradient map) */
+const MAPN = [
+  // id, x, y, w, h, title, sub, branch, target group
+  ["in_r", 30, 10, 270, 46, "d96 study → 16 windows", "[16, 3, 384, 384] per study (94 @320 eval)", "R", "R.input"],
+  ["r_stem", 30, 70, 270, 40, "stem: conv 7×7/2 · BN · ReLU · maxpool", "→ [64, 96, 96]", "R", "R.stem"],
+  ["r_l1", 30, 120, 270, 40, "layer1 · 3 bottlenecks", "→ [256, 96, 96]", "R", "R.backbone.layer1.0"],
+  ["r_l2", 30, 170, 270, 40, "layer2 · 4 bottlenecks", "→ [512, 48, 48]", "R", "R.backbone.layer2.0"],
+  ["r_l3", 30, 220, 270, 40, "layer3 · 6 bottlenecks", "→ [1024, 24, 24]", "R", "R.backbone.layer3.0"],
+  ["r_l4", 30, 270, 270, 40, "layer4 · 3 bottlenecks", "→ [2048, 12, 12]", "R", "R.backbone.layer4.0"],
+  ["r_gap", 30, 320, 270, 40, "global avg pool", "→ 16 tokens × 2048", "R", "R.pool"],
+  ["r_norm", 30, 370, 270, 40, "R.norm (LayerNorm) → hr", "shared by R head and fusion", "R", "R.head"],
+  ["r_head", 30, 430, 270, 46, "ResNet head", "att MLP · softmax over windows · clsW → z_R", "H", "R.head"],
+  ["in_s", 800, 10, 270, 46, "d96n study → ≤ 4 native series", "[1, 3, T, 320, 320] each", "S", "S.input"],
+  ["s_pe", 800, 70, 270, 40, "patch embed 2×4×4 · LN", "→ [T/2, 80, 80, 96]", "Z", "S.pe"],
+  ["s_1", 800, 120, 270, 40, "stage 1 · 2 blocks · C 96", "80×80 · windows 8×7×7", "Z", "S.shared.0.0"],
+  ["s_2", 800, 170, 270, 40, "PM1 · stage 2 (2 blocks) · PM2", "40×40 · C 192 → 384", "Z", "S.shared.2.0"],
+  ["s_3", 800, 220, 270, 40, "stage 3 · 6 blocks · C 384", "20×20 · lr 1.9e-5 … 3.3e-5", "S", "S.shared.4.0"],
+  ["s_4", 800, 270, 270, 40, "PM3 · stage 4 (2 blocks) · norm", "10×10 · C 768 · lr 3.6e-5 … 5e-5", "S", "S.branch.0.0"],
+  ["s_tok", 800, 320, 270, 40, "flatten → ⌈T/2⌉·100 tokens / series", "concat over series → N × 768", "S", "S.out"],
+  ["s_norm", 800, 370, 270, 40, "S.norm + series embedding → hs", "shared by S head and fusion", "S", "S.head"],
+  ["s_head", 800, 430, 270, 46, "Swin head", "att MLP · softmax over N tokens · clsW → z_S", "H", "S.head"],
+  ["f_pr", 360, 370, 190, 40, "pr: 2048→512 · LN · +kind[0]", "", "F", "F"],
+  ["f_ps", 590, 370, 190, 40, "ps: 768→512 · LN · +kind[1]", "", "F", "F"],
+  ["f_union", 400, 430, 340, 46, "union K + N tokens · branch dropout", "+ gate[branch] − log(count)", "F", "F"],
+  ["f_att", 400, 490, 340, 40, "att MLP → ONE softmax over the union", "per finding · [K+N, 12]", "F", "F"],
+  ["f_cls", 400, 540, 340, 40, "pool · clsW → z_fused (the prediction)", "", "F", "F"],
+  ["L_R", 30, 600, 270, 40, "BCE(z_R) × 0.5", "", "L", "L"],
+  ["L_F", 400, 600, 340, 40, "BCE(z_fused) × 1", "", "L", "L"],
+  ["L_S", 800, 600, 270, 40, "BCE(z_S) × 0.5", "", "L", "L"],
+  ["L_T", 400, 660, 340, 40, "loss / 4 → backward", "", "L", "L"]
+];
+const MAPE = [["in_r", "r_stem"], ["r_stem", "r_l1"], ["r_l1", "r_l2"], ["r_l2", "r_l3"], ["r_l3", "r_l4"], ["r_l4", "r_gap"], ["r_gap", "r_norm"], ["r_norm", "r_head"], ["r_norm", "f_pr"],
+["in_s", "s_pe"], ["s_pe", "s_1"], ["s_1", "s_2"], ["s_2", "s_3"], ["s_3", "s_4"], ["s_4", "s_tok"], ["s_tok", "s_norm"], ["s_norm", "s_head"], ["s_norm", "f_ps"],
+["f_pr", "f_union"], ["f_ps", "f_union"], ["f_union", "f_att"], ["f_att", "f_cls"], ["f_cls", "L_F"], ["r_head", "L_R"], ["s_head", "L_S"], ["L_R", "L_T"], ["L_F", "L_T"], ["L_S", "L_T"]];
+const BCOL = { R: ["var(--r-soft)", "var(--r)"], S: ["var(--s-soft)", "var(--s)"], Z: ["var(--frozen-soft)", "var(--frozen)"], F: ["var(--f-soft)", "var(--f)"], H: ["var(--f-soft)", "var(--f)"], L: ["var(--l-soft)", "var(--l)"] };
+function mapSVG(nodeStyle, edgeStyle, extra) {
+  const N = Object.fromEntries(MAPN.map(n => [n[0], n]));
+  let s = `<svg viewBox="0 0 1100 712" xmlns="http://www.w3.org/2000/svg" style="font-size:12px"><defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+  <marker id="ahl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--l)"/></marker></defs>`;
+  for (const [a, b] of MAPE) {
+    const A = N[a], B = N[b];
+    let x1 = A[1] + A[3] / 2, y1 = A[2] + A[4], x2 = B[1] + B[3] / 2, y2 = B[2];
+    if (a === "r_norm" && b === "f_pr") { x1 = A[1] + A[3]; y1 = A[2] + A[4] / 2; x2 = B[1]; y2 = B[2] + B[4] / 2; }
+    if (a === "s_norm" && b === "f_ps") { x1 = A[1]; y1 = A[2] + A[4] / 2; x2 = B[1] + B[3]; y2 = B[2] + B[4] / 2; }
+    if (a === "r_norm" && b === "r_head") { }
+    if (b === "L_T" && a !== "L_F") { x1 = a === "L_R" ? A[1] + A[3] : A[1]; y1 = A[2] + A[4] / 2; x2 = a === "L_R" ? B[1] : B[1] + B[3]; y2 = B[2] + B[4] / 2; }
+    const es = edgeStyle(a, b);
+    if (!es) continue;
+    s += es.rev ? `<line x1="${x2}" y1="${y2}" x2="${x1}" y2="${y1}" style="stroke:${es.c};stroke-width:${es.w}" marker-end="url(#ahl)"/>` : `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${es.c};stroke-width:${es.w}" marker-end="url(#ah)"/>`;
+    if (es.label) s += `<line x1="${B[1] - 12}" x2="${B[1] + B[3] + 12}" y1="${(y1 + y2) / 2}" y2="${(y1 + y2) / 2}" style="stroke:var(--frozen);stroke-width:3;stroke-dasharray:6 4"/><text x="${B[1] - 18}" y="${(y1 + y2) / 2 + 4}" text-anchor="end" style="fill:var(--l);font-weight:700">${es.label}</text>`;
+  }
+  for (const n of MAPN) {
+    const st = nodeStyle(n);
+    s += `<g class="mapnode" data-id="${n[0]}" data-g="${n[8]}" style="cursor:pointer"><rect x="${n[1]}" y="${n[2]}" width="${n[3]}" height="${n[4]}" rx="8" style="fill:${st.fill};stroke:${st.stroke};stroke-width:${st.sw || 1.5}"/>
+    <text x="${n[1] + 10}" y="${n[2] + 17}" style="fill:var(--ink);font-weight:650">${n[5]}${n[7] === "Z" ? " 🔒" : ""}</text>
+    <text x="${n[1] + 10}" y="${n[2] + 33}" style="fill:var(--muted);font-size:11px">${st.sub != null ? st.sub : n[6]}</text></g>`;
+  }
+  s += (extra || "") + "</svg>";
+  return s;
+}
+function initMap() {
+  $("#mapBox").innerHTML = mapSVG(n => ({ fill: BCOL[n[7]][0], stroke: BCOL[n[7]][1] }), () => ({ c: "var(--muted)", w: 1.4 }),
+    `<text x="550" y="40" text-anchor="middle" style="fill:var(--muted)">one study</text><text x="550" y="58" text-anchor="middle" style="fill:var(--muted)">two encoders, three heads</text>
+     <text x="550" y="200" text-anchor="middle" style="fill:var(--muted);font-size:11px">ResNet: 23.5 M params, lr 1e-4</text><text x="550" y="216" text-anchor="middle" style="fill:var(--muted);font-size:11px">Swin: 26.3 M trained + 1.5 M frozen</text><text x="550" y="232" text-anchor="middle" style="fill:var(--muted);font-size:11px">heads + fusion: 2.4 M, lr 1e-3</text>`);
+  $("#mapBox").addEventListener("click", e => {
+    const g = e.target.closest(".mapnode"); if (!g) return;
+    const grp = g.dataset.g; ST.filter = "all"; setSeg("#xFilter", "all"); ST.search = ""; $("#xSearch").value = "";
+    EXP.add(grp); renderExplorer();
+    const r = ROWS.find(x => x.grp === grp); if (r) { ST.sel = r.idx; renderExplorer(); }
+    document.getElementById("s-explorer").scrollIntoView();
+    setTimeout(() => { const el = $(`#xtable tr.row[data-i="${ST.sel}"]`); if (el) { const w = el.closest(".tablewrap"); w.scrollTop = el.offsetTop - 60; } }, 50);
+  });
+}
+
+/* ================================================================ 2a window sampler */
+const SLOTS = [26, 22, 18, 12, 18], SLOTN = ["sag FS", "sag T1", "cor FS", "cor T1", "axial"], SLOTC = ["#2f6fd0", "#5a8fe0", "#2c8a57", "#59b07f", "#d9771b"];
+const WS = { mode: "train", seed: 7 };
+function wsMask() {
+  const m = new Array(96).fill(true), b = [0, 26, 48, 66, 78, 96];
+  if ($("#wsShort").checked) for (let i = 18; i < 26; i++) m[i] = false;
+  if ($("#wsMissCT1").checked) for (let i = b[3]; i < b[4]; i++) m[i] = false;
+  if ($("#wsMissAx").checked) for (let i = b[4]; i < b[5]; i++) m[i] = false;
+  return m;
+}
+function centresJS(mask, k, train, rng) {
+  let valid = []; mask.forEach((v, i) => v && valid.push(i)); if (valid.length < 3) valid = [0, 1, 2];
+  const lo = Math.min(...valid), hi = Math.max(...valid);
+  const cs = []; for (let i = lo + 1; i < hi; i++) cs.push(i);
+  if (!train) { const out = []; for (let i = 0; i < k; i++) out.push(cs[Math.round(i * (cs.length - 1) / (k - 1))]); return { c: out, lo, hi, L: cs.length }; }
+  const out = []; for (let i = 0; i < k; i++) { const e0 = i * cs.length / k, e1 = (i + 1) * cs.length / k; out.push(cs[Math.min(Math.floor(e0 + rng() * (e1 - e0)), cs.length - 1)]); }
+  return { c: out, lo, hi, L: cs.length };
+}
+function drawWS() {
+  const cv = $("#wsCanvas"), g = cv.getContext("2d"), W = cv.width, H = cv.height, mask = wsMask();
+  const tr = WS.mode === "train", res = centresJS(mask, tr ? 16 : 94, tr, mulberry(WS.seed));
+  const cw = (W - 20) / 96, x0 = 10;
+  g.clearRect(0, 0, W, H); g.font = "12px system-ui"; g.textBaseline = "middle";
+  let b = 0;
+  for (let s = 0; s < 5; s++) { g.fillStyle = css("--muted"); g.fillText(`${SLOTN[s]} (${SLOTS[s]})`, x0 + (b + SLOTS[s] / 2) * cw - 30, 12); b += SLOTS[s]; }
+  const slotOf = []; SLOTS.forEach((n, s) => { for (let i = 0; i < n; i++) slotOf.push(s); });
+  for (let i = 0; i < 96; i++) {
+    const x = x0 + i * cw;
+    g.globalAlpha = mask[i] ? 0.35 : 0.08; g.fillStyle = SLOTC[slotOf[i]]; g.fillRect(x + 0.5, 26, cw - 1, 60); g.globalAlpha = 1;
+    if (!mask[i]) { g.strokeStyle = css("--frozen"); g.beginPath(); g.moveTo(x, 86); g.lineTo(x + cw, 26); g.stroke(); }
+  }
+  const cnt = new Map(); res.c.forEach(c => cnt.set(c, (cnt.get(c) || 0) + 1));
+  let straddle = 0, blank = 0;
+  res.c.forEach((c, k) => {
+    const y = 96 + (tr ? (k % 4) * 14 : 0);
+    if (slotOf[c - 1] !== slotOf[c + 1]) straddle++;
+    if (!mask[c - 1] || !mask[c] || !mask[c + 1]) blank++;
+    g.fillStyle = css("--ink"); g.globalAlpha = tr ? 0.9 : 0.35;
+    g.fillRect(x0 + (c - 1) * cw + 1, y, 3 * cw - 2, tr ? 9 : 40);
+    g.globalAlpha = 1;
+    if (tr) { g.fillStyle = css("--l"); g.fillRect(x0 + c * cw + cw / 2 - 1.5, 26, 3, 60); }
+  });
+  if (!tr) cnt.forEach((n, c) => { if (n > 1) { g.fillStyle = css("--l"); g.fillRect(x0 + c * cw + 1, 140, cw - 2, 6 * n); } });
+  g.fillStyle = css("--muted"); g.fillText(tr ? "windows (c−1, c, c+1), red = centre" : "94 windows (overlaid); red ticks below = repeated centres", x0, H - 8);
+  const perSlot = [0, 0, 0, 0, 0]; res.c.forEach(c => perSlot[slotOf[c]]++);
+  const dup = res.c.length - cnt.size;
+  $("#wsInfo").innerHTML = `Valid range ${res.lo}–${res.hi}; interior has <b>${res.L}</b> candidate centres. ${tr ? `16 bins of ≈ ${(res.L / 16).toFixed(1)} slices, one random centre each.` : `94 evenly spaced centres: <b>${dup}</b> repeats.`} Centres per slot: ${perSlot.map((n, s) => `${SLOTN[s]} ${n}`).join(" · ")}. Windows straddling two slots: <b>${straddle}</b>. Windows touching an empty slice: <b>${blank}</b> (empty slices are zeros, not skipped).`;
+}
+function initWS() {
+  seg("#wsMode", v => { WS.mode = v; drawWS(); });
+  $("#wsResample").onclick = () => { WS.seed++; drawWS(); };
+  ["#wsMissCT1", "#wsMissAx", "#wsShort"].forEach(id => $(id).onchange = drawWS);
+  drawWS();
+}
+
+/* ================================================================ 2b token table */
+function renderTok() {
+  let h = `<tr><th>series (slot)</th><th>present</th><th class="n">slices T</th><th>train: stride 2</th><th>train: dropped</th><th class="n">eval T′ = ⌈T/2⌉</th><th class="n">eval tokens</th><th class="n">train T′</th><th class="n">train tokens</th><th>grid per stage (eval)</th></tr>`;
+  let te = 0, tt = 0;
+  for (let j = 0; j < 4; j++) {
+    const Te = seriesT(j, false), Tt = seriesT(j, true), qe = Math.ceil(Te / 2), qt = Math.ceil(Tt / 2);
+    te += qe * 100; tt += qt * 100;
+    h += `<tr><td>${SERIES[j]} (${j})</td><td><input type="checkbox" data-k="present" data-j="${j}" ${ST.present[j] ? "checked" : ""}></td>
+    <td class="n"><input type="number" min="3" max="40" value="${ST.T[j]}" data-k="T" data-j="${j}"></td>
+    <td><input type="checkbox" data-k="stride2" data-j="${j}" ${ST.stride2[j] ? "checked" : ""} ${ST.T[j] < 16 ? "disabled" : ""}></td>
+    <td><input type="checkbox" data-k="drop" data-j="${j}" ${ST.drop[j] ? "checked" : ""}></td>
+    <td class="n">${qe || "—"}</td><td class="n">${qe ? fmtI(qe * 100) : "—"}</td><td class="n">${qt || "—"}</td><td class="n">${qt ? fmtI(qt * 100) : "—"}</td>
+    <td class="mono small">${qe ? `${qe}×80² → ${qe}×40² → ${qe}×20² → ${qe}×10²` : ""}</td></tr>`;
+  }
+  h += `<tr><td colspan="5"><b>study total N</b> (the Swin head and fusion see this many tokens)</td><td></td><td class="n"><b>${fmtI(te)}</b></td><td></td><td class="n"><b>${fmtI(tt)}</b></td><td class="small">vs K = 16 (train) / 94 (eval) ResNet tokens</td></tr>`;
+  $("#tokTable").innerHTML = h;
+}
+function initTok() {
+  renderTok();
+  $("#tokTable").addEventListener("change", e => {
+    const t = e.target, j = +t.dataset.j, k = t.dataset.k; if (k == null) return;
+    if (k === "T") ST.T[j] = Math.max(3, Math.min(40, +t.value || 3)); else ST[k][j] = t.checked;
+    renderTok(); renderExplorer(); drawWin(); drawFusion();
+  });
+}
+
+/* ================================================================ 2c augmentation lab */
+const AUG = { br: "R", mirror: false, rot: 0, scale: 1, tx: 0, ty: 0, lgam: 0, gain: 1, bias: 0, filt: "none", sigma: 0.75, alpha: 0.55, noise: 0, seed: 3 };
+let PHANTOM = null;
+function makePhantom() {
+  const S = 384, im = new Float32Array(S * S), rng = mulberry(11);
+  const ell = (cx, cy, rx, ry, v, rot = 0) => { const c = Math.cos(rot), s = Math.sin(rot); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const dx = x - cx, dy = y - cy, u = (dx * c + dy * s) / rx, w = (-dx * s + dy * c) / ry; if (u * u + w * w <= 1) im[y * S + x] = v; } };
+  ell(192, 200, 150, 178, 0.22);                    // soft tissue
+  ell(186, 104, 74, 96, 0.5); ell(186, 104, 58, 82, 0.62);   // femur cortex + marrow
+  ell(150, 178, 34, 24, 0.62); ell(222, 180, 36, 24, 0.62);  // condyles
+  ell(190, 300, 80, 66, 0.5); ell(190, 300, 66, 54, 0.6);    // tibia
+  ell(302, 150, 17, 42, 0.55, 0.15);                          // patella
+  for (let x = 110; x < 270; x++) for (let y = 206; y < 214; y++) im[y * S + x] = 0.88;  // joint fluid line
+  ell(282, 222, 26, 12, 0.92);                                // effusion pocket
+  const tri = (x0, y0, x1, y1, x2, y2, v) => { for (let y = 190; y < 240; y++) for (let x = 90; x < 300; x++) { const d = (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0), e = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1), f = (x0 - x2) * (y - y2) - (y0 - y2) * (x - x2); if ((d >= 0 && e >= 0 && f >= 0) || (d <= 0 && e <= 0 && f <= 0)) im[y * S + x] = v; } };
+  tri(110, 202, 150, 210, 110, 220, 0.06); tri(270, 202, 230, 210, 270, 220, 0.06);   // menisci
+  for (let t = 0; t < 60; t++) { const x = Math.round(176 + t * 0.7), y = Math.round(196 + t * 0.9); for (let d = -3; d <= 3; d++) im[y * S + x + d] = 0.1; } // ACL band
+  for (let i = 0; i < S * S; i++) im[i] = Math.max(0, Math.min(1, im[i] + (im[i] > 0.05 ? 0.03 * gauss(rng) : 0.01 * rng())));
+  return im;
+}
+function augRender() {
+  if (!PHANTOM) PHANTOM = makePhantom();
+  const S = 384, src = PHANTOM, cvS = $("#augSrc"), cvO = $("#augOut"), D = 256;
+  // source with crop overlay
+  const gs = cvS.getContext("2d"), is = gs.createImageData(D, D);
+  for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) { const v = src[Math.floor(y * S / D) * S + Math.floor(x * S / D)] * 255; const k = (y * D + x) * 4; is.data[k] = is.data[k + 1] = is.data[k + 2] = v; is.data[k + 3] = 255; }
+  gs.putImageData(is, 0, 0);
+  gs.strokeStyle = "#f0a057"; gs.setLineDash([5, 4]); const c0 = D * (32 / 384); gs.strokeRect(c0, c0, D - 2 * c0, D - 2 * c0); gs.setLineDash([]);
+  gs.fillStyle = "#f0a057"; gs.font = "11px system-ui"; gs.fillText("centre 320 crop", c0 + 4, c0 + 13);
+  // output
+  const sw = AUG.br === "S", f = sw ? 320 / 384 : 1, ang = AUG.rot * Math.PI / 180;
+  const c = Math.cos(ang) / AUG.scale * f, s = Math.sin(ang) / AUG.scale * f;
+  const out = new Float32Array(D * D), gam = Math.exp(AUG.lgam);
+  for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+    let xo = (2 * x + 1) / D - 1, yo = (2 * y + 1) / D - 1;
+    let xi = c * xo - s * yo + AUG.tx * 2, yi = s * xo + c * yo + AUG.ty * 2;
+    if (AUG.mirror) xi = -xi;
+    const px = (xi + 1) * S / 2 - 0.5, py = (yi + 1) * S / 2 - 0.5, x0 = Math.floor(px), y0 = Math.floor(py), fx = px - x0, fy = py - y0;
+    const at = (u, v) => (u < 0 || v < 0 || u >= S || v >= S) ? 0 : src[v * S + u];
+    let v = at(x0, y0) * (1 - fx) * (1 - fy) + at(x0 + 1, y0) * fx * (1 - fy) + at(x0, y0 + 1) * (1 - fx) * fy + at(x0 + 1, y0 + 1) * fx * fy;
+    v = Math.min(1, Math.pow(Math.max(v, 1e-4), gam) * AUG.gain);
+    out[y * D + x] = v;
+  }
+  if (sw) {
+    const rng = mulberry(AUG.seed);
+    if (AUG.bias > 0) {
+      const gr = Array.from({ length: 16 }, () => gauss(rng)), mx = Math.max(...gr.map(Math.abs), 1e-6);
+      for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        const gx = x / (D - 1) * 3, gy = y / (D - 1) * 3, ix = Math.min(2, Math.floor(gx)), iy = Math.min(2, Math.floor(gy)), ax = gx - ix, ay = gy - iy;
+        const g = gr[iy * 4 + ix] * (1 - ax) * (1 - ay) + gr[iy * 4 + ix + 1] * ax * (1 - ay) + gr[(iy + 1) * 4 + ix] * (1 - ax) * ay + gr[(iy + 1) * 4 + ix + 1] * ax * ay;
+        out[y * D + x] *= Math.exp(AUG.bias * g / mx);
+      }
+    }
+    if (AUG.filt !== "none") {
+      const sg = AUG.sigma * D / 320, k = [-2, -1, 0, 1, 2].map(i => Math.exp(-i * i / (2 * sg * sg))), ks = k.reduce((a, b) => a + b), kk = k.map(v => v / ks);
+      const tmp = new Float32Array(D * D), bl = new Float32Array(D * D), cl = (i) => Math.max(0, Math.min(D - 1, i));
+      for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) { let a = 0; for (let i = -2; i <= 2; i++) a += kk[i + 2] * out[y * D + cl(x + i)]; tmp[y * D + x] = a; }
+      for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) { let a = 0; for (let i = -2; i <= 2; i++) a += kk[i + 2] * tmp[cl(y + i) * D + x]; bl[y * D + x] = a; }
+      for (let i = 0; i < D * D; i++) out[i] = AUG.filt === "blur" ? bl[i] : out[i] + AUG.alpha * (out[i] - bl[i]);
+    }
+    if (AUG.noise > 0) for (let i = 0; i < D * D; i++) out[i] += gauss(rng) * AUG.noise;
+  }
+  const go = cvO.getContext("2d"), io = go.createImageData(D, D);
+  for (let i = 0; i < D * D; i++) { const v = Math.max(0, Math.min(1, out[i])) * 255; io.data[4 * i] = io.data[4 * i + 1] = io.data[4 * i + 2] = v; io.data[4 * i + 3] = 255; }
+  go.putImageData(io, 0, 0);
+  $("#augNote").innerHTML = sw ? `Swin: output = 320×320 at native pixel scale (θ scaled by 320/384), one draw <b>per series</b>. Bias field drawn on a 4×4 grid (bicubic in the code, bilinear here). The mirror is shown as a width flip (coronal/axial); a sagittal series reverses its slice order instead.`
+    : `ResNet: output = 384×384 = the full 140 mm field; the same draw is applied to all 16 windows of the study. The mirror is shown as a width flip (coronal/axial windows); a sagittal window reverses its 3 slice channels instead. At evaluation the network sees only the dashed centre crop.`;
+}
+function augControls() {
+  const sw = AUG.br === "S";
+  const rows = [["mirror", "checkbox", null, null, null, "mirror (p 0.5)"], ["rot", "range", -10, 10, 0.5, "rotation ° U(±10)"], ["scale", "range", 0.9, 1.1, 0.01, "scale U(0.9–1.1)"], ["tx", "range", -0.06, 0.06, 0.005, "shift x U(±6% W)"], ["ty", "range", -0.06, 0.06, 0.005, "shift y U(±6% H)"], ["lgam", "range", -0.25, 0.25, 0.01, "gamma: log γ U(±0.25)"], ["gain", "range", 0.9, 1.1, 0.01, "gain U(0.9–1.1)"]];
+  if (sw) rows.push(["bias", "range", 0, 0.3, 0.01, "bias field amp (p 0.3)"], ["filt", "select", null, null, null, "blur / sharpen (p 0.2 each)"], ["sigma", "range", 0.5, 1, 0.05, "σ px"], ["noise", "range", 0, 0.03, 0.001, "noise σ (p 0.2)"]);
+  $("#augCtrls").innerHTML = rows.map(r => {
+    const [k, t, mn, mx, st, lab] = r;
+    const inp = t === "checkbox" ? `<input type="checkbox" data-a="${k}" ${AUG[k] ? "checked" : ""}>` : t === "select" ? `<select data-a="${k}">${["none", "blur", "sharpen"].map(o => `<option ${AUG[k] === o ? "selected" : ""}>${o}</option>`).join("")}</select>` : `<input type="range" data-a="${k}" min="${mn}" max="${mx}" step="${st}" value="${AUG[k]}">`;
+    return `<span>${lab}</span>${inp}<span class="mono" data-v="${k}">${t === "range" ? (+AUG[k]).toFixed(3) : ""}</span>`;
+  }).join("");
+}
+function initAug() {
+  augControls(); augRender();
+  seg("#augBranch", v => { AUG.br = v; augControls(); augRender(); });
+  $("#augCtrls").addEventListener("input", e => {
+    const k = e.target.dataset.a; if (!k) return;
+    AUG[k] = e.target.type === "checkbox" ? e.target.checked : e.target.tagName === "SELECT" ? e.target.value : +e.target.value;
+    const v = $(`#augCtrls [data-v="${k}"]`); if (v && e.target.type === "range") v.textContent = (+AUG[k]).toFixed(3);
+    augRender();
+  });
+  $("#augDraw").onclick = () => {
+    const r = Math.random, u = () => r() * 2 - 1;
+    Object.assign(AUG, { mirror: r() < 0.5, rot: u() * 10, scale: 1 + u() * 0.1, tx: u() * 0.06, ty: u() * 0.06, lgam: u() * 0.25, gain: 1 + u() * 0.1, seed: Math.floor(r() * 1e6) });
+    if (AUG.br === "S") { AUG.bias = r() < 0.3 ? r() * 0.3 : 0; const q = r(); AUG.filt = q < 0.2 ? "blur" : q < 0.4 ? "sharpen" : "none"; AUG.sigma = 0.5 + r() * 0.5; AUG.alpha = 0.3 + r() * 0.5; AUG.noise = r() < 0.2 ? r() * 0.03 : 0; }
+    augControls(); augRender();
+  };
+  $("#augReset").onclick = () => { Object.assign(AUG, { mirror: false, rot: 0, scale: 1, tx: 0, ty: 0, lgam: 0, gain: 1, bias: 0, filt: "none", sigma: 0.75, noise: 0 }); augControls(); augRender(); };
+}
+
+/* ================================================================ 5a window explorer */
+const WIN = { stage: 0, shift: 0, series: 0, hover: null };
+function drawWin() {
+  const cv = $("#winCanvas"), g = cv.getContext("2d"), H = [80, 40, 20, 10][WIN.stage];
+  const T = seriesT(WIN.series, false) || ST.T[WIN.series], Tq = Math.ceil(T / 2);
+  const wg = winGeom(Tq, H, WIN.shift === 1), w = wg.ws[1], s = wg.sh[1], Hp = wg.Hp, cs = 540 / Hp, o = 10;
+  g.clearRect(0, 0, cv.width, cv.height);
+  const roll = i => ((i - s) % Hp + Hp) % Hp, reg = ip => s ? (ip < Hp - w ? 0 : ip < Hp - s ? 1 : 2) : 0;
+  const key = (r, c) => { const rr = roll(r), cc = roll(c); return `${Math.floor(rr / w)},${Math.floor(cc / w)},${reg(rr)},${reg(cc)}`; };
+  const win = (r, c) => { const rr = roll(r), cc = roll(c); return Math.floor(rr / w) * 97 + Math.floor(cc / w); };
+  const hk = WIN.hover ? key(WIN.hover[0], WIN.hover[1]) : null;
+  const pal = ["#2f6fd0", "#d9771b", "#2c8a57", "#7b4bc9", "#c23b4a", "#1f9bb3"];
+  let att = 0, attPad = 0;
+  for (let r = 0; r < Hp; r++) for (let c = 0; c < Hp; c++) {
+    const x = o + c * cs, y = o + r * cs, pad = r >= H || c >= H, wi = win(r, c), k = key(r, c);
+    const rr = roll(r), cc = roll(c), wr = Math.floor(rr / w), wc = Math.floor(cc / w);
+    g.fillStyle = pal[(wr * 2 + wc * 3 + (wr + wc) % 2) % pal.length]; g.globalAlpha = pad ? 0.08 : 0.22;
+    if (s) { const rk = reg(rr) * 3 + reg(cc); if (rk) g.globalAlpha = pad ? 0.1 : 0.12 + 0.05 * rk; }
+    g.fillRect(x, y, cs - (cs > 4 ? 1 : 0), cs - (cs > 4 ? 1 : 0)); g.globalAlpha = 1;
+    if (pad) { g.strokeStyle = css("--frozen"); g.lineWidth = 1; g.beginPath(); g.moveTo(x, y + cs); g.lineTo(x + cs, y); g.stroke(); }
+    if (hk && k === hk) { g.fillStyle = css("--l"); g.globalAlpha = 0.65; g.fillRect(x, y, cs - (cs > 4 ? 1 : 0), cs - (cs > 4 ? 1 : 0)); g.globalAlpha = 1; att++; if (pad) attPad++; }
+    else if (hk && win(r, c) === win(WIN.hover[0], WIN.hover[1])) { g.strokeStyle = css("--l"); g.lineWidth = 1; g.strokeRect(x + 1, y + 1, cs - 3, cs - 3); }
+  }
+  // window boundaries (in original coordinates)
+  g.strokeStyle = css("--ink"); g.lineWidth = 2;
+  for (let k = 0; k <= Hp / w; k++) { const p = ((k * w + s) % Hp); const z = o + p * cs; g.beginPath(); g.moveTo(z, o); g.lineTo(z, o + Hp * cs); g.stroke(); g.beginPath(); g.moveTo(o, z); g.lineTo(o + Hp * cs, z); g.stroke(); }
+  g.strokeStyle = css("--muted"); g.lineWidth = 1; g.strokeRect(o, o, H * cs, H * cs);
+  if (WIN.hover) { const [r, c] = WIN.hover; g.strokeStyle = css("--ink"); g.lineWidth = 2.5; g.strokeRect(o + c * cs, o + r * cs, cs, cs); }
+  const tokPx = [4, 8, 16, 32][WIN.stage];
+  $("#winInfo").innerHTML = `<div class="kv"><div>grid</div><div>${H}×${H} tokens (each ${tokPx}×${tokPx} px ≈ ${(tokPx * 140 / 384).toFixed(1)} mm), padded to ${Hp}×${Hp}</div>
+  <div>window</div><div>${wg.ws.join(" × ")} (depth × H × W) = ${wg.n} tokens${wg.shiftedEff ? `; shift ${wg.sh.join("/")}` : ""}</div>
+  <div>depth</div><div>T = ${T} slices → T′ = ${Tq} → padded ${wg.Tp}</div>
+  <div>windows / series</div><div>${wg.nW} (${wg.Tp / wg.ws[0]} in depth × ${(Hp / w) ** 2} in-plane)</div>
+  <div>real tokens</div><div>${(100 * Tq * H * H / (wg.Tp * Hp * Hp)).toFixed(0)}% of the padded grid</div>
+  ${WIN.hover ? `<div>hovered token</div><div>(${WIN.hover[0]}, ${WIN.hover[1]})${WIN.hover[0] >= H || WIN.hover[1] >= H ? " — a padding token" : ""}: attends to <b>${att}</b> of its window's ${w * w} in-plane positions (${attPad} of them padding), × ${wg.ws[0]} depth positions${wg.shiftedEff && att < w * w ? "; the rest are masked by the shift mask" : ""}</div>` : `<div>hover</div><div>move the mouse over the grid</div>`}</div>
+  <p class="small">${WIN.stage >= 2 ? "Stages 3–4 are trained." : "Stages 1–2 are frozen."} Stage 4's 10×10 grid is padded to 14×14 (and T′ to a multiple of 8), so 49% of the padded in-plane grid is zeros. Only the top-left window is fully real; the corner window holds just 3×3 real positions. torchvision does not mask the padding, so real tokens also attend to these zero tokens (the padding is added after norm1, so their keys and values are just the qkv bias).</p>`;
+  // depth strip
+  const ct = $("#winT"), gt = ct.getContext("2d"), wT = wg.ws[0], sT = wg.sh[0], Tp = wg.Tp, cw = Math.min(30, 500 / Tp);
+  gt.clearRect(0, 0, ct.width, ct.height); gt.font = "11px system-ui";
+  for (let t = 0; t < Tp; t++) {
+    const tr_ = ((t - sT) % Tp + Tp) % Tp, wi = Math.floor(tr_ / wT), pad = t >= Tq;
+    gt.fillStyle = pal[wi % pal.length]; gt.globalAlpha = pad ? 0.1 : 0.4; gt.fillRect(10 + t * cw, 20, cw - 2, 34); gt.globalAlpha = 1;
+    if (pad) { gt.strokeStyle = css("--frozen"); gt.beginPath(); gt.moveTo(10 + t * cw, 54); gt.lineTo(10 + t * cw + cw - 2, 20); gt.stroke(); }
+    gt.fillStyle = css("--muted"); if (cw > 14 || t % 4 === 0) gt.fillText(String(t), 10 + t * cw + 2, 68);
+  }
+  gt.fillStyle = css("--muted"); gt.fillText(`T′ = ${Tq} depth tokens (slice pairs), window ${wT}${sT ? ", shifted by " + sT : ""}; colour = depth window`, 10, 12);
+}
+function initWin() {
+  seg("#winStage", v => { WIN.stage = +v; WIN.hover = null; drawWin(); });
+  seg("#winShift", v => { WIN.shift = +v; drawWin(); });
+  const sel = $("#winSeries"); sel.innerHTML = SERIES.map((s, j) => `<option value="${j}">${s}</option>`).join(""); sel.onchange = () => { WIN.series = +sel.value; drawWin(); };
+  const cv = $("#winCanvas");
+  cv.addEventListener("mousemove", e => {
+    const H = [80, 40, 20, 10][WIN.stage], Tq = Math.ceil((seriesT(WIN.series, false) || ST.T[WIN.series]) / 2), wg = winGeom(Tq, H, WIN.shift === 1);
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * cv.width, y = (e.clientY - r.top) / r.height * cv.height, cs = 540 / wg.Hp;
+    const c = Math.floor((x - 10) / cs), rr = Math.floor((y - 10) / cs);
+    if (c < 0 || rr < 0 || c >= wg.Hp || rr >= wg.Hp) return;
+    if (!WIN.hover || WIN.hover[0] !== rr || WIN.hover[1] !== c) { WIN.hover = [rr, c]; drawWin(); }
+  });
+  cv.addEventListener("mouseleave", () => { WIN.hover = null; drawWin(); });
+  drawWin();
+}
+
+/* ================================================================ 6 head table + pooling lab */
+function initHeadTable() {
+  $("#headTable").innerHTML = `<tr><th>head</th><th>tokens per study</th><th>token dim</th><th>attention MLP</th><th>softmax over</th><th class="n">params</th><th>lr / wd</th><th>loss weight</th></tr>
+  <tr><td><span class="tag R">ResNet head</span> R.*</td><td>K = 16 / 94 windows</td><td>2048 (LayerNorm)</td><td>2048→256→tanh→drop 0.2→12</td><td>windows (dim 1)</td><td class="n">556,312</td><td>1e-3 / 0.05</td><td>0.5</td></tr>
+  <tr><td><span class="tag S">Swin head</span> S.*</td><td>N = Σ ⌈T/2⌉·100</td><td>768 (LN + series emb.)</td><td>768→256→tanh→drop 0.2→12</td><td>tokens (dim 0)</td><td class="n">213,784</td><td>1e-3 / 0.05</td><td>0.5</td></tr>
+  <tr><td><span class="tag F">fused head</span> pr, ps, kind, att, gate, clsW</td><td>K + N</td><td>512 (projected + LN + kind)</td><td>512→256→tanh→drop 0.2→12, + gate − log count</td><td>union of both (dim 0)</td><td class="n">1,586,480</td><td>1e-3 / 0.05</td><td>1</td></tr>`;
+}
+const PL0 = { e: [1.0, 0.2, -0.5, 0.5, 0.0, -1.0], v: [2.0, 0.5, -1.0, 1.0, -0.5, 0.3], gate: 0 };
+const PL = { e: PL0.e.slice(), v: PL0.v.slice(), gate: 0, y: 1, lr: 1, hist: [] };
+function plCompute() {
+  const pr = [PL.gate, PL.gate, PL.gate, 0, 0, 0];
+  const s = PL.e.map((e, i) => e + pr[i]), mx = Math.max(...s), ex = s.map(x => Math.exp(x - mx)), Z = ex.reduce((a, b) => a + b), a = ex.map(x => x / Z);
+  const z = a.reduce((t, ai, i) => t + ai * PL.v[i], 0), p = sigmoid(z), L = -(PL.y * Math.log(p) + (1 - PL.y) * Math.log(1 - p)), dz = p - PL.y;
+  const dv = a.map(ai => ai * dz), de = a.map((ai, i) => ai * (PL.v[i] - z) * dz), dg = de[0] + de[1] + de[2];
+  const mR = a[0] + a[1] + a[2], mS = 1 - mR, vR = (a[0] * PL.v[0] + a[1] * PL.v[1] + a[2] * PL.v[2]) / mR, vS = (a[3] * PL.v[3] + a[4] * PL.v[4] + a[5] * PL.v[5]) / mS;
+  return { a, z, p, L, dz, dv, de, dg, mR, mS, vR, vS };
+}
+function renderPL() {
+  const c = plCompute(), names = ["R1", "R2", "R3", "S1", "S2", "S3"];
+  const bar = (x, mx, col) => `<span class="bar-i" style="width:${Math.min(44, Math.abs(x) / mx * 44)}px;background:${col}"></span>`;
+  const mxg = Math.max(...c.de.map(Math.abs), ...c.dv.map(Math.abs), 1e-9);
+  let h = `<tr><th>token</th><th>score e</th><th>vote v = h·clsW</th><th class="n">a (attention)</th><th class="n">a·v</th><th class="n">∂L/∂e</th><th class="n">∂L/∂v</th></tr>`;
+  for (let i = 0; i < 6; i++) {
+    const col = i < 3 ? "var(--r)" : "var(--s)";
+    h += `<tr><td><b style="color:${col}">${names[i]}</b></td><td><input type="range" min="-3" max="3" step="0.05" value="${PL.e[i]}" data-pe="${i}" style="width:72px"> <span class="mono">${PL.e[i].toFixed(2)}</span></td>
+    <td><input type="range" min="-4" max="4" step="0.05" value="${PL.v[i]}" data-pv="${i}" style="width:72px"> <span class="mono">${PL.v[i].toFixed(2)}</span></td>
+    <td class="n">${c.a[i].toFixed(3)} ${bar(c.a[i], 1, col)}</td><td class="n">${(c.a[i] * PL.v[i]).toFixed(3)}</td>
+    <td class="n">${c.de[i].toFixed(4)} ${bar(c.de[i], mxg, c.de[i] > 0 ? "var(--l)" : "var(--ok)")}</td><td class="n">${c.dv[i].toFixed(4)} ${bar(c.dv[i], mxg, c.dv[i] > 0 ? "var(--l)" : "var(--ok)")}</td></tr>`;
+  }
+  $("#plTable").innerHTML = h;
+  PL.hist.push(c.L); if (PL.hist.length > 200) PL.hist.shift();
+  $("#plOut").innerHTML = `<div class="mathline">z = Σ a·v = ${c.z.toFixed(4)}      p = σ(z) = ${c.p.toFixed(4)}
+L = BCE(p, y=${PL.y.toFixed(2)}) = ${c.L.toFixed(4)}
+∂L/∂z = p − y = ${c.dz.toFixed(4)}
+∂L/∂e_n = a_n (v_n − z) ∂L/∂z      ∂L/∂v_n = a_n ∂L/∂z
+mass  m_R = ${c.mR.toFixed(3)}   m_S = ${c.mS.toFixed(3)}
+mean vote  v̄_R = ${c.vR.toFixed(3)}   v̄_S = ${c.vS.toFixed(3)}
+∂L/∂gate = Σ_R ∂L/∂e = ${c.dg.toFixed(4)}
+         = m_R·m_S·(v̄_R − v̄_S)·∂L/∂z = ${(c.mR * c.mS * (c.vR - c.vS) * c.dz).toFixed(4)}  ✓</div>
+<p class="small"><b>Read it like this.</b> Gradient descent moves each parameter <i>against</i> its gradient. A green ∂L/∂e (negative) means "give this token more attention": its vote is on the label's side of the current average. A red one means less. ∂L/∂v pushes every token's vote toward the label, in proportion to its attention, so tokens the head ignores barely learn. The gate moves toward the branch whose average vote is better. Set y = 0.5: at z = 0 every gradient vanishes, because soft labels have an interior optimum.</p>
+<div class="svgbox" id="plHist"></div>`;
+  if (PL.hist.length > 1) lineChart($("#plHist"), { w: 460, h: 140, series: [{ name: "loss after each change", color: "var(--l)", pts: PL.hist.map((v, i) => [i, v]) }], xmin: 0, xmax: Math.max(10, PL.hist.length - 1), ymin: 0, ymax: Math.max(0.1, ...PL.hist) * 1.05, yticks: [0, Math.max(0.1, ...PL.hist) / 2, Math.max(0.1, ...PL.hist)], fmtY: v => v.toFixed(3), xname: "update" });
+}
+function initPL() {
+  const upd = () => { $("#plYv").textContent = PL.y.toFixed(2); $("#plGv").textContent = PL.gate.toFixed(2); $("#plLrv").textContent = PL.lr.toFixed(1); $("#plG").value = PL.gate; renderPL(); };
+  $("#plY").oninput = e => { PL.y = +e.target.value; upd(); };
+  $("#plG").oninput = e => { PL.gate = +e.target.value; upd(); };
+  $("#plLr").oninput = e => { PL.lr = +e.target.value; upd(); };
+  $("#plTable").addEventListener("input", e => { const t = e.target; if (t.dataset.pe != null) PL.e[+t.dataset.pe] = +t.value; if (t.dataset.pv != null) PL.v[+t.dataset.pv] = +t.value; upd(); });
+  const step = () => { const c = plCompute(); for (let i = 0; i < 6; i++) { PL.e[i] = Math.max(-3, Math.min(3, PL.e[i] - PL.lr * c.de[i])); PL.v[i] = Math.max(-4, Math.min(4, PL.v[i] - PL.lr * c.dv[i])); } PL.gate = Math.max(-3, Math.min(3, PL.gate - PL.lr * c.dg)); };
+  $("#plStep").onclick = () => { step(); upd(); };
+  $("#plStep10").onclick = () => { for (let k = 0; k < 9; k++) { step(); PL.hist.push(plCompute().L); } step(); upd(); };
+  $("#plReset").onclick = () => { PL.e = PL0.e.slice(); PL.v = PL0.v.slice(); PL.gate = 0; PL.hist = []; upd(); };
+  $("#plRand").onclick = () => { const r = mulberry(Date.now() & 0xffff); PL.e = PL.e.map(() => +(r() * 4 - 2).toFixed(2)); PL.v = PL.v.map(() => +(r() * 6 - 3).toFixed(2)); PL.hist = []; upd(); };
+  upd();
+}
+
+/* ================================================================ 7 fusion simulator */
+const FU = { find: 1, K: 16, prior: true, gate: RES.gate[1], mu: 0, sig: 1, drop: false };
+function drawFusion() {
+  const tr = FU.K === 16, N = Math.max(1, swinTokens(tr)), K = FU.K, rng = mulberry(1234);
+  const eR = Array.from({ length: K }, () => FU.mu + FU.sig * gauss(rng)), eS = Array.from({ length: N }, () => FU.sig * gauss(rng));
+  const pR = FU.gate - (FU.prior ? Math.log(K) : 0), pS = -(FU.prior ? Math.log(N) : 0);
+  const sR = eR.map(e => e + pR), sS = eS.map(e => e + pS);
+  const mx = Math.max(...sR, ...sS);
+  const xR = FU.drop ? [] : sR.map(s => Math.exp(s - mx)), xS = sS.map(s => Math.exp(s - mx));
+  const Z = xR.reduce((a, b) => a + b, 0) + xS.reduce((a, b) => a + b, 0);
+  const aR = xR.map(x => x / Z), aS = xS.map(x => x / Z), mR = aR.reduce((a, b) => a + b, 0);
+  const eff = 1 / (aR.reduce((a, b) => a + b * b, 0) + aS.reduce((a, b) => a + b * b, 0));
+  // the same without the prior, for contrast (same scores)
+  const noR = FU.drop ? 0 : eR.reduce((a, e) => a + Math.exp(e + FU.gate - mx), 0), noS = eS.reduce((a, e) => a + Math.exp(e - mx), 0), mNo = noR / (noR + noS);
+  const pred = (kk) => { const r2 = mulberry(99); const a = Array.from({ length: kk }, () => FU.mu + FU.sig * gauss(r2)).reduce((s, e) => s + Math.exp(e + FU.gate - (FU.prior ? Math.log(kk) : 0)), 0); const b = Array.from({ length: Math.min(N, 4000) }, () => FU.sig * gauss(r2)).reduce((s, e) => s + Math.exp(e), 0) * (N / Math.min(N, 4000)) * (FU.prior ? 1 / N : 1); return a / (a + b); };
+  const f = FU.find;
+  $("#fuOut").innerHTML = `<div class="cards">
+   <div class="card"><div class="k">ResNet mass m_R (this setting)</div><div class="v" style="color:var(--r)">${(100 * mR).toFixed(1)}%</div><div class="d">Swin ${(100 * (1 - mR)).toFixed(1)}%${FU.drop ? " · ResNet dropped from the pool" : ""}</div></div>
+   <div class="card"><div class="k">same scores, no −log(count)</div><div class="v">${(100 * mNo).toFixed(2)}%</div><div class="d">${K} vs ${fmtI(N)} tokens</div></div>
+   <div class="card"><div class="k">K = 16 → 94 with prior</div><div class="v">${(100 * pred(16)).toFixed(1)}% → ${(100 * pred(94)).toFixed(1)}%</div><div class="d">stable across train / eval</div></div>
+   <div class="card"><div class="k">K = 16 → 94 without prior</div><div class="v">${FU.prior ? (100 * (() => { FU.prior = false; const a = pred(16); FU.prior = true; return a; })()).toFixed(2) : (100 * pred(16)).toFixed(2)}% → ${FU.prior ? (100 * (() => { FU.prior = false; const a = pred(94); FU.prior = true; return a; })()).toFixed(2) : (100 * pred(94)).toFixed(2)}%</div><div class="d">${(() => { const was = FU.prior; FU.prior = false; const r = pred(94) / pred(16); FU.prior = was; return "would shift " + r.toFixed(1) + "× at evaluation"; })()}</div></div>
+   <div class="card"><div class="k">effective # tokens (1/Σa²)</div><div class="v">${eff.toFixed(0)}</div><div class="d">of ${fmtI((FU.drop ? 0 : K) + N)} in the pool</div></div>
+   <div class="card"><div class="k">learned for ${FIND[f]}</div><div class="v">gate ${RES.gate[f] >= 0 ? "+" : ""}${RES.gate[f].toFixed(2)}</div><div class="d">measured ResNet share (SWA, val) ${RES.mean ? "" : ""}${SHARE.SWA[f].toFixed(3)} · study-to-study sd ${RES.sd[f].toFixed(2)}</div></div></div>
+   <p class="small">Scores are synthetic (Gaussian, mean R − S = ${FU.mu.toFixed(2)}, σ ${FU.sig.toFixed(2)}). Only the gate values and measured shares are from the run. The measured share also reflects the score differences learned by the attention MLP, which is why ${FIND[f]}'s share (${SHARE.SWA[f].toFixed(2)}) is not just sigmoid(gate). With σ = 0 and mean difference 0, m_R = sigmoid(gate) exactly.</p>`;
+  const cv = $("#fuCanvas"), g = cv.getContext("2d"), W = cv.width, H = cv.height, wr = W * 0.22;
+  g.clearRect(0, 0, W, H);
+  const mxA = Math.max(...aR, ...(aS.length ? [Math.max(...aS)] : [0]), 1e-12);
+  g.fillStyle = css("--r");
+  aR.forEach((a, i) => { const bw = wr / Math.max(K, 1); const h = (a / mxA) * (H - 30); g.fillRect(i * bw + 1, H - 20 - h, Math.max(1, bw - 2), h); });
+  const cols = Math.floor(W - wr - 10), per = Math.ceil(N / cols);
+  g.fillStyle = css("--s");
+  const colSum = []; for (let c = 0; c < cols; c++) { let sc = 0; for (let i = c * per; i < Math.min(N, (c + 1) * per); i++) sc += aS[i]; colSum.push(sc); }
+  const mxS = Math.max(...colSum, 1e-12);
+  colSum.forEach((sc, c) => { const h = (sc / mxS) * (H - 30); g.fillRect(wr + 10 + c, H - 20 - h, 1, h); });
+  g.fillStyle = css("--muted"); g.font = "12px system-ui"; g.fillText(`ResNet windows (K = ${K}, ${FU.drop ? "dropped" : (100 * mR).toFixed(1) + "% total"})`, 2, H - 4); g.fillText(`Swin tokens (N = ${fmtI(N)}; summed per pixel column of ${per}, own scale: tallest column = ${(100 * mxS).toFixed(2)}%) — ${(100 * (1 - mR)).toFixed(1)}% total`, wr + 12, H - 4);
+}
+function initFusion() {
+  const sel = $("#fuFind"); sel.innerHTML = FIND.map((f, i) => `<option value="${i}" ${i === 1 ? "selected" : ""}>${f} (gate ${RES.gate[i] >= 0 ? "+" : ""}${RES.gate[i].toFixed(2)})</option>`).join("");
+  const sync = () => { $("#fuGate").value = FU.gate; $("#fuGatev").textContent = FU.gate.toFixed(2); $("#fuMuv").textContent = FU.mu.toFixed(2); $("#fuSigv").textContent = FU.sig.toFixed(2); drawFusion(); };
+  sel.onchange = () => { FU.find = +sel.value; FU.gate = RES.gate[FU.find]; sync(); };
+  seg("#fuK", v => { FU.K = +v; sync(); });
+  $("#fuPrior").onchange = e => { FU.prior = e.target.checked; sync(); };
+  $("#fuDrop").onchange = e => { FU.drop = e.target.checked; sync(); };
+  $("#fuGate").oninput = e => { FU.gate = +e.target.value; sync(); };
+  $("#fuMu").oninput = e => { FU.mu = +e.target.value; sync(); };
+  $("#fuSig").oninput = e => { FU.sig = +e.target.value; sync(); };
+  sync();
+}
+
+/* ================================================================ 8 loss lab */
+function drawLoss() {
+  const y = +$("#lsY").value, z0 = +$("#lsZ").value, w = +$("#lsW").value;
+  $("#lsYv").textContent = y.toFixed(2); $("#lsZv").textContent = z0.toFixed(2); $("#lsWv").textContent = w.toFixed(2);
+  const L = z => { const p = sigmoid(z); return w * -(y * Math.log(Math.max(p, 1e-12)) + (1 - y) * Math.log(Math.max(1 - p, 1e-12))); }, D = z => w * (sigmoid(z) - y);
+  const pts = [], gp = []; for (let z = -6; z <= 6.001; z += 0.1) { pts.push([z, L(z)]); gp.push([z, D(z)]); }
+  const ymax = Math.max(1, ...pts.map(p => p[1]));
+  lineChart($("#lsChart"), {
+    w: 900, h: 240, xmin: -6, xmax: 6, ymin: -1, ymax: Math.min(ymax, 6.5), cursor: z0, xticks: [-6, -4, -2, 0, 2, 4, 6], yticks: [-1, 0, 1, 2, 3, 4, 5, 6].filter(v => v <= Math.min(ymax, 6.5)), fmtY: v => v.toFixed(2), xname: "z",
+    series: [{ name: "loss w·BCE(σ(z), y)", color: "var(--l)", pts }, { name: "gradient ∂/∂z = w(σ(z) − y)", color: "var(--f)", pts: gp }, { name: "", color: "var(--ink)", pts: [[z0, L(z0)], [z0, D(z0)]], dots: true, noline: true, r: 5 }],
+    hlines: [{ y: 0, color: "var(--muted)", label: "" }]
+  });
+  const zs = y > 0 && y < 1 ? Math.log(y / (1 - y)) : (y >= 1 ? Infinity : -Infinity);
+  $("#lsOut").innerHTML = `At z = ${z0.toFixed(2)}: p = ${sigmoid(z0).toFixed(3)}, loss ${L(z0).toFixed(4)}, gradient ${D(z0).toFixed(4)} (then ÷ Σw over the 2-study batch, × 1 or 0.5, ÷ 4). The loss is minimised at z* = logit(y) = ${isFinite(zs) ? zs.toFixed(2) : (zs > 0 ? "+∞" : "−∞")}. A soft label of ${y.toFixed(2)} asks for a probability of ${y.toFixed(2)}, not certainty. The gradient is bounded in [−w, w], so no single cell can dominate a step.`;
+}
+function initLoss() { ["#lsY", "#lsZ", "#lsW"].forEach(id => $(id).oninput = drawLoss); drawLoss(); }
+
+/* ================================================================ 9a gradient map + 9b walk */
+const GM = { F: true, R: true, S: true, drop: 0 };
+function gradSources(id) {
+  const F = GM.F, Rr = GM.R, Ss = GM.S, dR = GM.drop === 1, dS = GM.drop === 2, out = [];
+  const rB = ["r_stem", "r_l1", "r_l2", "r_l3", "r_l4", "r_gap", "r_norm"], sB = ["s_3", "s_4", "s_tok", "s_norm"];
+  if (rB.includes(id)) { if (F && !dR) out.push("fused ×1"); if (Rr) out.push("R ×0.5"); }
+  if (id === "r_head" && Rr) out.push("R ×0.5");
+  if (sB.includes(id)) { if (F && !dS) out.push("fused ×1"); if (Ss) out.push("S ×0.5"); }
+  if (id === "s_head" && Ss) out.push("S ×0.5");
+  if (id === "f_pr" && F && !dR) out.push("fused ×1");
+  if (id === "f_ps" && F && !dS) out.push("fused ×1");
+  if (["f_union", "f_att", "f_cls"].includes(id) && F) out.push("fused ×1");
+  if (id === "L_F" && F) out.push("active"); if (id === "L_R" && Rr) out.push("active"); if (id === "L_S" && Ss) out.push("active"); if (id === "L_T" && (F || Rr || Ss)) out.push("seed 1/4");
+  return out;
+}
+function drawGM() {
+  const srcs = Object.fromEntries(MAPN.map(n => [n[0], gradSources(n[0])]));
+  $("#gmBox").innerHTML = mapSVG(n => {
+    const s = srcs[n[0]], frozen = n[7] === "Z", data = n[0].startsWith("in_");
+    if (frozen) return { fill: "var(--frozen-soft)", stroke: "var(--frozen)", sub: "no_grad: no graph, no gradient" };
+    if (data) return { fill: "var(--panel2)", stroke: "var(--line)", sub: "data: no gradient" };
+    if (!s.length) return { fill: "var(--panel2)", stroke: "var(--line)", sub: "no gradient in this setting" };
+    if (n[0].startsWith("L_")) return { fill: "var(--l-soft)", stroke: "var(--l)", sub: n[0] === "L_T" ? "backward starts here: ∂ = 1/4" : "active: sends w(σ(z) − y)/Σw × weight / 4" };
+    const strong = s.some(x => x.startsWith("fused")) && s.length > 1;
+    return { fill: "var(--l-soft)", stroke: "var(--l)", sw: strong ? 3 : 1.5, sub: "∂ from " + s.join(" + ") };
+  }, (a, b) => {
+    const live = gradSources(b).length && gradSources(a).length && !MAPN.find(n => n[0] === a)[7].includes("Z");
+    if (a === "r_norm" && b === "f_pr" && !gradSources("f_pr").length) return { c: "var(--line)", w: 1 };
+    if (a === "s_norm" && b === "f_ps" && !gradSources("f_ps").length) return { c: "var(--line)", w: 1 };
+    if (a === "s_2" && b === "s_3") return { c: "var(--frozen)", w: 2, label: "no_grad wall: backward stops here ✋" };
+    return live ? { c: "var(--l)", w: 2, rev: true } : { c: "var(--line)", w: 1 };
+  }, "");
+}
+function initGM() {
+  $("#gmF").onchange = e => { GM.F = e.target.checked; drawGM(); };
+  $("#gmR").onchange = e => { GM.R = e.target.checked; drawGM(); };
+  $("#gmS").onchange = e => { GM.S = e.target.checked; drawGM(); };
+  seg("#gmDrop", v => { GM.drop = +v; drawGM(); });
+  drawGM();
+  const W = [
+    ["Seed", "L", "<code>(loss/4).backward()</code> puts ∂ = 1/4 on the total, which becomes 1/4 on the fused BCE and 1/8 on each branch BCE. Shapes: scalars."],
+    ["BCE → logits", "L", "Each BCE turns into <code>∂z = w·(σ(z) − y)/Σw × weight</code> for the [2, 12] logits of its head. Cells with w = 0 get exactly 0. Three separate [2, 12] gradient tensors start their journeys."],
+    ["Fused head", "F", "<code>∂clsW[k] = ∂z_k·pooled_k</code>; <code>∂pooled_k = ∂z_k·clsW[k]</code>. Through the pooling: <code>∂u_n += Σ_k a[n,k]∂pooled_k</code> and <code>∂a[n,k] = u_n·∂pooled_k</code>. Softmax backward over the union gives <code>∂e[n,k] = a[n,k](v[n,k] − z̄_k)∂z_k</code>, which goes back into the attention MLP (att[3] → dropout mask → tanh′ → att[0]) and adds a second contribution to ∂u_n. The prior's gradient is summed per branch into <code>∂gate</code> [2, 12]; the log(count) part is a constant."],
+    ["Split the union", "F", "∂u [K+N, 512] is cut into ∂ur [K, 512] and ∂us [N, 512]. If branch dropout removed a branch for this study, that part does not exist, so the branch gets no fused gradient. Each part goes through <code>+kind</code> (∂kind = column sums), LayerNorm backward and the projection: <b>pr</b> gives ∂hr_fused [K, 2048], <b>ps</b> gives ∂hs_fused [N, 768]."],
+    ["Swin head", "S", "The ½-weighted ∂z_S runs the same pooling/softmax/MLP backward over the N tokens, giving ∂hs_aux [N, 768]. Autograd <b>adds</b> it to ∂hs_fused at hs. Then the series embedding gets the per-series sums, and S.norm backward gives ∂tokens per series."],
+    ["Swin encoder, per series", "S", "For each series, last layer first: flatten → final LN → stage-4 block 1 (MLP: fc2 → GELU′ → fc1 → LN₂; residual copy), then (attention: proj → SDPA backward → qkv → LN₁; un-roll / un-partition; residual copy). DropPath masks gate the branch gradients. Then block 0 → PM3 (split 4C into 4 tokens) → stage-3 blocks 5…0. Shared weights accumulate over all series and both studies. Relative-position tables accumulate over every window pair with the same offset."],
+    ["The wall", "Z", "At the input of stage-3 block 0 the tensor came from <code>no_grad</code>, so autograd stops. Patch embedding and stages 1–2 are never visited. Their 1.54 M parameters keep their Kinetics values for the whole run."],
+    ["ResNet head", "R", "½·∂z_R → clsW, pooling, softmax over the 16 windows, attention MLP → ∂hr_aux [2, 16, 2048]. Added to ∂hr_fused from pr. LayerNorm R.norm backward gives ∂f [2, 16, 2048], which is reshaped to the 32 window vectors."],
+    ["ResNet backbone", "R", "GAP backward spreads each window's 2048-vector gradient evenly over its 12×12 grid. Then for layer4 → layer1, each block in reverse: ReLU mask → (residual: copy to skip) → bn3 → conv3 → ReLU → bn2 → conv2 (∂W, ∂x via transposed conv) → ReLU → bn1 → conv1. BN backward couples all 32 windows of the forward pass. Downsample paths get their own share. Stem: maxpool routes to argmax → ReLU → BN → conv1 (∂W only)."],
+    ["Accumulate, clip, step", "L", "This repeats for 4 forward passes, adding into fp32 <code>.grad</code>. Then <code>clip_grad_norm_(all params, 1.0)</code> computes one global L2 norm over the ~52 M gradients and scales them all if it exceeds 1. AdamW updates each of the 23 groups with its own lr and weight decay. LambdaLR advances one step. <code>zero_grad(set_to_none=True)</code>. All activations of the 4 passes were freed as each backward finished."]
+  ];
+  $("#bwalk").innerHTML = `<ol>${W.map(w => `<li><span class="tag ${w[1]}">${w[0]}</span> ${w[2]}</li>`).join("")}</ol>`;
+}
+
+/* ================================================================ 10 optimiser */
+function initOptim() {
+  const rows = [
+    ["ResNet backbone", "R", "R.backbone.* (all convs, all BN γ/β)", 23508032, 1e-4, "0.05 (all)"],
+    ["ResNet head", "H", "R.norm, R.att, R.clsW, R.clsb", 556312, 1e-3, "0.05 (all)"]
+  ];
+  const blk3 = [1769472, 35412], blk4 = [7077888, 70824];
+  for (let b = 0; b < 6; b++) rows.push([`Swin stage 3 · block ${b}`, "S", "qkv/proj/fc1/fc2 W (decay) · LN, biases, rel-pos table (no decay)", blk3[0] + blk3[1], SW_LR(7 + b), `0.05 on ${fmtI(blk3[0])} · 0 on ${fmtI(blk3[1])}`]);
+  rows.push(["Swin patch merge 3", "S", "reduction W (decay) · LN (no decay)", 1182720, SW_LR(13), "0.05 on 1,179,648 · 0 on 3,072"]);
+  for (let b = 0; b < 2; b++) rows.push([`Swin stage 4 · block ${b}`, "S", "as stage 3, C 768, 24 heads", blk4[0] + blk4[1], SW_LR(14 + b), `0.05 on ${fmtI(blk4[0])} · 0 on ${fmtI(blk4[1])}`]);
+  rows.push(["Swin final norm", "S", "S.branch.0.2", 1536, SW_LR(16), "0"]);
+  rows.push(["Swin head", "H", "S.norm, S.series, S.att, S.clsW, S.clsb", 213784, 1e-3, "0.05 (all)"]);
+  rows.push(["Fusion", "F", "pr, ps, kind, att, gate, clsW, clsb", 1586480, 1e-3, "0.05 (all)"]);
+  rows.push(["(frozen) Swin patch embed, stage 1, PM1, stage 2, PM2", "Z", "requires_grad = False, not in the optimiser", 1539486, null, "—"]);
+  const tot = rows.filter(r => r[4]).reduce((a, r) => a + r[3], 0);
+  $("#grpTable").innerHTML = `<tr><th>group</th><th>contents</th><th class="n">params</th><th class="n">peak lr</th><th>weight decay</th></tr>` +
+    rows.map(r => `<tr><td><span class="tag ${r[1]}">${r[0]}</span></td><td class="small">${r[2]}</td><td class="n">${fmtI(r[3])}</td><td class="n">${r[4] ? fmtLr(r[4]) : "—"}</td><td class="small">${r[5]}</td></tr>`).join("") +
+    `<tr><td colspan="2"><b>trainable total</b> (23 AdamW groups after splitting decay / no-decay and dropping empty ones)</td><td class="n"><b>${fmtI(tot)}</b></td><td></td><td></td></tr>`;
+  // llrd bars
+  const names = ["patch embed", "s1 b0", "s1 b1", "PM1", "s2 b0", "s2 b1", "PM2", "s3 b0", "s3 b1", "s3 b2", "s3 b3", "s3 b4", "s3 b5", "PM3", "s4 b0", "s4 b1", "norm"];
+  const W = 560, H = 230, m = { l: 50, b: 50, t: 10 }, bw = (W - m.l - 10) / 17, mx = 5e-5;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="font-size:10px">`;
+  [0, 1e-5, 2e-5, 3e-5, 4e-5, 5e-5].forEach(v => { const y = m.t + (H - m.t - m.b) * (1 - v / mx); s += `<line x1="${m.l}" x2="${W - 10}" y1="${y}" y2="${y}" style="stroke:var(--line)"/><text x="${m.l - 4}" y="${y + 3}" text-anchor="end" style="fill:var(--muted)">${v ? v.toExponential(0) : "0"}</text>`; });
+  for (let i = 0; i < 17; i++) {
+    const v = SW_LR(i), h = (H - m.t - m.b) * v / mx, x = m.l + i * bw, fz = i < 7;
+    s += `<rect x="${x + 2}" y="${H - m.b - h}" width="${bw - 4}" height="${h}" style="fill:${fz ? "var(--frozen-soft)" : "var(--s)"};stroke:${fz ? "var(--frozen)" : "none"};stroke-dasharray:${fz ? "3 2" : "0"}"><title>${names[i]}: ${fmtLr(v)}${fz ? " (frozen, unused)" : ""}</title></rect>`;
+    s += `<text transform="translate(${x + bw / 2 + 3} ${H - m.b + 6}) rotate(60)" style="fill:var(--muted)">${names[i]}</text>`;
+  }
+  $("#llrdChart").innerHTML = s + "</svg>";
+  // schedule
+  const spe = 441, total = spe * 20, warm = spe, floor = 0.01;
+  const lam = q => q < warm ? (q + 1) / warm : floor + (1 - floor) * 0.5 * (1 + Math.cos(Math.PI * Math.min(1, (q - warm) / Math.max(1, total - warm))));
+  const G2 = [["ResNet backbone (1e-4)", "var(--r)", 1e-4], ["heads + fusion (1e-3)", "var(--f)", 1e-3], ["Swin top: final norm (5e-5)", "var(--s)", 5e-5], ["Swin stage-3 block 0 (1.94e-5)", "#b65c10", SW_LR(7)]];
+  const draw = q => {
+    const series = G2.map(g => ({ name: g[0], color: g[1], pts: Array.from({ length: 442 }, (_, i) => { const qq = Math.min(total - 1, i * 20); return [qq, g[2] * lam(qq)]; }) }));
+    series.push({ name: "logged lr, ResNet (history.json)", color: "var(--ink)", pts: HIST.lrR.map((v, i) => [spe * (i + 1), v]), dots: true, noline: true, r: 3 });
+    lineChart($("#lrChart"), {
+      w: 1000, h: 300, xmin: 0, xmax: total, ymin: 1e-8, ymax: 2e-3, ylog: true, cursor: q, series,
+      xticks: [0, 2205, 4410, 6615, 8820], fmtX: v => String(v), xlabel: "optimiser step q (441 per epoch; ticks every 5 epochs)", yticks: [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3], fmtY: v => v.toExponential(2),
+      bands: [{ x0: spe * 15, x1: total, label: "SWA epochs 16–20" }], tipX: x => `step ${x} · epoch ${(Math.floor(x / spe) + 1)}`
+    });
+    $("#lrQv").textContent = `epoch ${Math.floor(q / spe) + 1}, step ${q % spe + 1}/441, multiplier ${lam(q).toFixed(5)}`;
+    $("#lrTable").innerHTML = `At this step: ` + [["ResNet backbone", 1e-4], ["heads / fusion", 1e-3], ["Swin final norm", SW_LR(16)], ["Swin stage-4 b1", SW_LR(15)], ["Swin PM3", SW_LR(13)], ["Swin stage-3 b0", SW_LR(7)]].map(([n, b]) => `<span class="pill">${n} ${fmtLr(b * lam(q))}</span>`).join(" ");
+  };
+  $("#lrQ").oninput = e => draw(+e.target.value);
+  draw(0);
+}
+
+/* ================================================================ 11 stepper */
+function initStepper() {
+  const lam1 = 1 / 441;
+  const S = [
+    ["DataLoader yields 2 studies", "8 worker processes run <code>Both.__getitem__</code>: the d96 memmap → 16 stratified windows <code>[16, 3, 384, 384]</code> uint8 + sagittal flags + labels y, w [12]; the d96n memmap → the native volume [n, 384, 384] + slot per row. <code>collate</code> stacks the windows to <code>[2, 16, 3, 384, 384]</code> and keeps the volumes as a list (their depths differ). Shuffle seed = 2026·100 + epoch."],
+    ["Branch-dropout draw", "For each of the 2 studies: keep both (p 0.85), drop ResNet tokens (0.075) or drop Swin tokens (0.075) from the fused pool."],
+    ["GPU augmentation", "Under bf16 autocast: <code>s.Prep</code> builds each study's series list [(slot, [1, 3, T, 320, 320])] with per-series random augmentation; <code>rr.prepare</code> turns the windows into <code>[32, 3, 384, 384]</code> normalised, channels_last."],
+    ["ResNet forward (32 windows at once)", "<code>R.backbone(xr)</code>: 32 images through 53 conv layers, BN in train mode with batch statistics over the 32 windows → [32, 2048] → view [2, 16, 2048] → R.norm → hr → the ResNet head gives z_R [2, 12]. Every activation needed for backward is stored."],
+    ["Swin forward (series by series)", "For study i, for each series: patch embed + stages 1–2 + PM2 under <code>no_grad</code> (no graph); stage 3, PM3, stage 4, norm with graph → tokens. Concatenate, S.norm + series embedding → hs → the Swin head gives z_S [12]."],
+    ["Fusion (per study)", "pr(hr[i]) + kind[0], ps(hs) + kind[1] → union (minus a dropped branch) → att MLP + gate − log(count) → softmax over K+N → pool → clsW → z_fused [12]; share logged."],
+    ["Loss", "Stack to [2, 12] per head. <code>loss = BCE(z_F) + 0.5·(BCE(z_R) + BCE(z_S))</code>, each weighted by w and normalised by Σw. Epoch 1 means: 0.5275 / 0.5395 / 0.5327 → total 1.0636."],
+    ["Backward of loss / 4", "Autograd walks the graph in reverse (section 9b) and adds into <code>.grad</code>. The activations of this pass are freed. GPU memory peaks here (14.5 GiB in the profile)."],
+    ["Repeat ×4", "Steps 1–8 run for 4 consecutive forward passes (forwards i = 0, 1, 2, 3). Gradients accumulate, so the step sees 8 studies. 1,762 forwards per epoch → 441 steps (the last one has only 2 forwards)."],
+    ["Clip", "<code>clip_grad_norm_(model.parameters(), 1.0)</code>: one L2 norm over every gradient in the model, rescaled to ≤ 1."],
+    ["AdamW step", `Each of the 23 groups: m, v moments, bias correction, decoupled decay, update. At epoch 1 step 1 the lr multiplier is 1/441, so the ResNet backbone gets lr ${fmtLr(1e-4 * lam1)}, heads/fusion ${fmtLr(1e-3 * lam1)} and Swin stage-3 block 0 ${fmtLr(SW_LR(7) * lam1)}.`],
+    ["Scheduler + zero_grad", "<code>sched.step()</code> sets the multiplier for the next step, (q+1)/441 during warm-up, then the cosine. <code>opt.zero_grad(set_to_none=True)</code> frees the gradients. Every 400 forwards the log prints the running loss and s/study."]
+  ];
+  let k = 0, timer = null;
+  const render = () => {
+    $("#stepList").innerHTML = S.map((s, i) => `<li class="${i === k ? "on" : ""}" data-i="${i}">${s[0]}</li>`).join("");
+    const fw = k >= 8 ? 4 : 1;
+    $("#stDetail").innerHTML = `<div class="panel" style="margin:0"><h4 style="margin-top:0">${k + 1}. ${S[k][0]}</h4><p>${S[k][1]}</p>
+    <div class="kv"><div>forward passes in this step</div><div>${k < 8 ? "1 of 4 (repeats)" : "4 of 4"}</div><div>studies in this step</div><div>${fw * 2}${k < 8 ? " so far" : ""}</div><div>optimiser step q</div><div>${k >= 10 ? "0 → 1" : "0"}</div><div>lr multiplier</div><div>${k >= 11 ? "2/441 = 0.00454 for the next step" : "1/441 = 0.00227"}</div></div></div>`;
+  };
+  $("#stepList").addEventListener("click", e => { const li = e.target.closest("li"); if (li) { k = +li.dataset.i; render(); } });
+  $("#stPrev").onclick = () => { k = Math.max(0, k - 1); render(); };
+  $("#stNext").onclick = () => { k = Math.min(S.length - 1, k + 1); render(); };
+  $("#stAuto").onclick = () => { if (timer) { clearInterval(timer); timer = null; $("#stAuto").textContent = "autoplay"; return; } $("#stAuto").textContent = "stop"; timer = setInterval(() => { k = (k + 1) % S.length; render(); }, 2200); };
+  render();
+}
+
+/* ================================================================ 12 dynamics */
+function initDyn() {
+  const ep = HIST.epoch;
+  lineChart($("#chLoss"), {
+    w: 560, h: 260, xmin: 1, xmax: 20, ymin: 0.36, ymax: 0.55, xticks: [1, 5, 10, 15, 20], yticks: [0.36, 0.4, 0.44, 0.48, 0.52], xname: "epoch", fmtY: v => v.toFixed(4),
+    series: [{ name: "fused", color: "var(--f)", pts: ep.map((e, i) => [e, HIST.fused[i]]), dots: true }, { name: "ResNet head", color: "var(--r)", pts: ep.map((e, i) => [e, HIST.r50[i]]), dots: true }, { name: "Swin head", color: "var(--s)", pts: ep.map((e, i) => [e, HIST.swin[i]]), dots: true }],
+    bands: [{ x0: 15.5, x1: 20, label: "SWA" }]
+  });
+  lineChart($("#chVal"), {
+    w: 560, h: 260, xmin: 1, xmax: 20, ymin: 0.74, ymax: 0.92, xticks: [1, 5, 10, 15, 20], yticks: [0.75, 0.8, 0.85, 0.9], xname: "epoch", fmtY: v => v.toFixed(4),
+    series: [{ name: "fused", color: "var(--f)", pts: VAL.epoch.map((e, i) => [e, VAL.fused[i]]), dots: true }, { name: "ResNet head", color: "var(--r)", pts: VAL.epoch.map((e, i) => [e, VAL.r50[i]]), dots: true }, { name: "Swin head", color: "var(--s)", pts: VAL.epoch.map((e, i) => [e, VAL.swin[i]]), dots: true }, { name: "mean of branch heads", color: "var(--muted)", dash: "4 3", pts: VAL.epoch.map((e, i) => [e, VAL.mean[i]]) }],
+    hlines: [{ y: 0.83, color: "var(--l)", label: "kill line @ epoch 5" }], bands: [{ x0: 15.5, x1: 20, label: "SWA" }]
+  });
+  lineChart($("#chBce"), {
+    w: 560, h: 240, xmin: 1, xmax: 20, ymin: 0.36, ymax: 0.6, xticks: [1, 5, 10, 15, 20], yticks: [0.36, 0.42, 0.48, 0.54, 0.6], xname: "epoch", fmtY: v => v.toFixed(4),
+    series: [{ name: "val BCE (fused)", color: "var(--l)", pts: VAL.epoch.map((e, i) => [e, VAL.bce[i]]), dots: true }, { name: "train BCE (fused)", color: "var(--f)", dash: "4 3", pts: ep.map((e, i) => [e, HIST.fused[i]]) }]
+  });
+  const cols = ["1", "3", "5", "10", "13", "15", "16", "17", "18", "19", "20", "SWA"];
+  const col = v => { const d = v - 0.5, a = Math.min(1, Math.abs(d) / 0.3); return d >= 0 ? `rgba(47,111,208,${0.15 + 0.7 * a})` : `rgba(217,119,27,${0.15 + 0.7 * a})`; };
+  $("#shareHeat").innerHTML = `<div class="tablewrap"><table class="heat"><tr><th style="text-align:left">finding</th>${cols.map(c => `<th>${c}</th>`).join("")}<th>gate</th></tr>` +
+    FIND.map((f, i) => `<tr><td style="text-align:left">${SHORT[i]}</td>${cols.map(c => `<td style="background:${col(SHARE[c][i])}" title="${f}, epoch ${c}: ResNet share ${SHARE[c][i]}">${SHARE[c][i].toFixed(2)}</td>`).join("")}<td>${RES.gate[i] >= 0 ? "+" : ""}${RES.gate[i].toFixed(2)}</td></tr>`).join("") + `</table></div>`;
+}
+
+/* ================================================================ 14 results */
+function initResults() {
+  const cards = [["fused (SWA)", "0.9725 / 0.9084", "clear6 / 10-target"], ["ResNet head", "0.9727 / 0.8995", "vs label-v2 r50 0.9739 / 0.9075"], ["Swin head", "0.9548 / 0.8953", "vs B2 0.9542 / 0.8941"], ["A = mean(1e, B2)", "0.9715 / 0.9112", "the bar to beat"], ["gates", "3 × FAIL", "primary · submission-worthy · LB candidate"], ["public LB", "0.930", "submission 57270107"]];
+  $("#resCards").innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="d">${c[2]}</div></div>`).join("");
+  const bar = v => `<span class="bar-i" style="width:${Math.max(0, (v - 0.74) / 0.25 * 90)}px;background:var(--f)"></span>`;
+  $("#resTable").innerHTML = `<tr><th>finding</th><th class="n">fused</th><th></th><th class="n">ResNet hd</th><th class="n">Swin hd</th><th class="n">mean hds</th><th class="n">1e</th><th class="n">B2</th><th class="n">A</th><th class="n">fused − A</th><th class="n">ResNet share</th><th class="n">gate R−S</th></tr>` +
+    FIND.map((f, i) => { const d = RES.fused[i] - RES.A[i]; return `<tr><td>${f}</td><td class="n"><b>${RES.fused[i].toFixed(4)}</b></td><td>${bar(RES.fused[i])}</td><td class="n">${RES.r50[i].toFixed(4)}</td><td class="n">${RES.swin[i].toFixed(4)}</td><td class="n">${RES.mean[i].toFixed(4)}</td><td class="n">${RES.e1[i].toFixed(4)}</td><td class="n">${RES.b2[i].toFixed(4)}</td><td class="n">${RES.A[i].toFixed(4)}</td><td class="n" style="color:${d >= 0 ? "var(--ok)" : "var(--l)"}">${d >= 0 ? "+" : ""}${d.toFixed(4)}</td><td class="n"><span class="bar-i" style="width:${SHARE.SWA[i] * 60}px;background:var(--r)"></span><span class="bar-i" style="width:${(1 - SHARE.SWA[i]) * 60}px;background:var(--s)"></span> ${SHARE.SWA[i].toFixed(3)}</td><td class="n">${RES.gate[i] >= 0 ? "+" : ""}${RES.gate[i].toFixed(2)}</td></tr>`; }).join("");
+  lineChart($("#chSweep"), {
+    w: 560, h: 260, xmin: -3, xmax: 3, ymin: 0.89, ymax: 0.98, xticks: [-3, -2, -1, 0, 1, 2, 3], yticks: [0.89, 0.91, 0.93, 0.95, 0.97], fmtY: v => v.toFixed(4),
+    series: [{ name: "clear6", color: "var(--f)", pts: SWEEP.map(s => [s[0], s[2]]), dots: true }, { name: "10-target", color: "var(--l)", pts: SWEEP.map(s => [s[0], s[3]]), dots: true }],
+    tipX: x => { const s = SWEEP.find(q => q[0] === x); return `shift d = ${x} · mean ResNet mass ${s ? s[1] : ""}`; }, xlabel: "shift of every study's R-vs-S log-odds (d)"
+  });
+  const occ = [["d96 sagFS (ResNet)", -0.025, 0.008, -0.004, -0.003, -0.003, 0.000, -0.012], ["d96 sagT1 (ResNet)", -0.005, -0.002, -0.001, -0.007, 0.000, -0.000, 0.001], ["d96 corFS (ResNet)", 0.000, -0.001, -0.002, 0.000, -0.001, -0.003, 0.004], ["d96 corT1 (ResNet)", 0.000, -0.002, 0.000, 0.000, -0.004, -0.001, -0.000], ["d96 axial (ResNet)", 0.001, -0.002, 0.000, 0.000, 0.000, -0.001, 0.000], ["d96n sagFS (Swin)", -0.004, -0.004, -0.001, -0.000, 0.002, 0.001, -0.005], ["d96n sag non-FS (Swin)", -0.001, 0.002, -0.002, -0.003, -0.002, 0.000, 0.002], ["d96n coronal (Swin)", -0.000, -0.023, 0.001, -0.001, -0.001, 0.000, 0.002], ["d96n axial (Swin)", -0.000, 0.001, -0.000, -0.001, -0.007, -0.009, -0.015]];
+  const oc = v => v <= -0.005 ? `background:rgba(194,59,74,${Math.min(0.8, 0.15 + Math.abs(v) * 25)})` : "";
+  $("#occTable").innerHTML = `<tr><th>removed</th><th class="n">ACL</th><th class="n">MCL</th><th class="n">Med men</th><th class="n">Med OA</th><th class="n">Effus</th><th class="n">Contus</th><th class="n">Fract</th></tr>` +
+    occ.map(r => `<tr><td>${r[0]}</td>${r.slice(1).map(v => `<td class="n" style="${oc(v)}">${v > 0 ? "+" : ""}${v.toFixed(3)}</td>`).join("")}</tr>`).join("");
+}
+
+/* ================================================================ appendix */
+const CFG_DUMP = {
+  version: "joint_r50_swin3d_j1_v1", labels: "label-v2 dd0ab9ab", epochs: 20, warmup_epochs: 1, lr_floor: 0.01, swa_epochs: [16, 17, 18, 19, 20], studies_per_step: 2, accum: 4,
+  r_lr: 1e-4, r_head_lr: 1e-3, fuse_lr: 1e-3, wd: 0.05, grad_clip: 1.0, fuse_dim: 512, aux_w: 0.5, branch_drop_p: 0.15, bn_refresh_studies: 256, seed: 2026, workers: 8,
+  eval_epochs: [1, 3, 5, 10, 13, 15, 16, 17, 18, 19, 20], kill: { epoch: 5, min_val: 0.83 },
+  r_cfg: { version: "d96_r50_exp1e_pertarget_v1", arch: "resnet50.tv_in1k", train_res: 384, eval_res: 320, img: 384, maxs: 96, slot_sizes: [26, 22, 18, 12, 18], train_windows: 16, eval_windows: 94, aug: { mirror_p: 0.5, rot_deg: 10.0, scale: 0.1, shift: 0.06, gamma: 0.25, gain: 0.1 } },
+  s_cfg: { version: "d96n_swin3d_t_b2_v1", arch: "torchvision swin3d_t, Kinetics-400 weights", res: 320, img: 384, lr: 5e-5, llrd: 0.9, head_lr: 1e-3, drop_path: 0.25, freeze: 4, branches: 1, pool: "tokens", attn: "sdpa", ckpt: false, aug: { mirror_p: 0.5, rot_deg: 10.0, scale: 0.1, shift: 0.06, gamma: 0.25, gain: 0.1 }, aug2: { series_drop_p: 0.1, stride2_p: 0.25, stride2_min: 16, bias_p: 0.3, bias_amp: 0.3, blur_p: 0.2, sharpen_p: 0.2, noise_p: 0.2, noise_std: 0.03 } },
+  runtime: { autocast: "bfloat16", tf32: true, optimizer: "AdamW (betas 0.9/0.999, eps 1e-8 defaults)", scheduler: "LambdaLR: linear warm-up 441 steps, cosine to 1% over 8,820 steps", channels_last: "ResNet branch", recovery: "recovery.pt every epoch (resumed after epoch 11)" }
+};
+
+/* ================================================================ theme, toc, boot */
+function initTheme() {
+  $("#themeBtn").onclick = () => {
+    const cur = document.documentElement.getAttribute("data-theme"), dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    drawWS(); drawWin(); drawFusion(); augRender();
+  };
+}
+function initToc() {
+  const links = $$("#toc a"), map = new Map(links.map(a => [a.getAttribute("href").slice(1), a]));
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { links.forEach(a => a.classList.remove("on")); const a = map.get(e.target.id); if (a) a.classList.add("on"); } }), { rootMargin: "-10% 0px -80% 0px" });
+  map.forEach((a, id) => { const el = document.getElementById(id); if (el) io.observe(el); });
+}
+function boot() {
+  const steps = [initHero, initMap, initWS, initTok, initAug, initExplorer, renderExplorer, initWin, initHeadTable, initPL, initFusion, initLoss, initGM, initOptim, initStepper, initDyn, initResults, initTheme, initToc];
+  for (const f of steps) { try { f(); } catch (e) { console.error("init failed:", f.name, e); } }
+  $("#cfgDump").textContent = JSON.stringify(CFG_DUMP, null, 2);
+  // the RF table for section 4
+  const tr = ST.mode;
+  ST.mode = "train"; const rr = []; buildR(rr, true); ST.mode = tr;
+  const pick = ["R.backbone.conv1", "R.backbone.maxpool", "R.backbone.layer1.2.act3", "R.backbone.layer2.3.act3", "R.backbone.layer3.5.act3", "R.backbone.layer4.2.act3"];
+  const lab = ["stem conv", "after maxpool", "end of layer1", "end of layer2", "end of layer3", "end of layer4"];
+  $("#rfTable").innerHTML = `<tr><th>point</th><th>map (train / eval)</th><th class="n">channels</th><th class="n">stride</th><th class="n">RF px</th><th class="n">RF mm</th></tr>` +
+    pick.map((p, i) => { const r = rr.find(x => x.path === p); return `<tr><td>${lab[i]}</td><td class="mono">${r.outS[2]}² / ${Math.round(r.outS[2] * 320 / 384)}²</td><td class="n">${r.outS[1]}</td><td class="n">${r.jmp}</td><td class="n">${r.rf}</td><td class="n">${(r.rf * 140 / 384).toFixed(0)}</td></tr>`; }).join("");
+}
+document.addEventListener("DOMContentLoaded", boot);
+
+</script>
+</body>
+</html>

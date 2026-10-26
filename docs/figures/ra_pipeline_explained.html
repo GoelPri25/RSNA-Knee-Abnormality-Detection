@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ra Training Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --ink:#1d1f23; --muted:#62666e; --faint:#9aa0a8; --line:#e4e4e0;
+  --accent:#3559e0; --accent-soft:#e8edfd; --glob:#2f7d6d; --glob-soft:#e3f2ee; --crop:#b5562b; --crop-soft:#f8eae2;
+  --teach:#7a4fc4; --teach-soft:#efe8fa; --warn:#a8741a; --warn-soft:#fbf2df;
+  --s0:#3d7bd9; --s1:#8fb3ea; --s2:#2f9e78; --s3:#9fd6c1; --s4:#c9883b; --empty:#e9e9e6;
+  --code:#f1f1ee; --shadow:0 1px 2px rgba(20,20,30,.05),0 4px 16px rgba(20,20,30,.04);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121417; --panel:#1a1d21; --ink:#e7e8ea; --muted:#a3a8b0; --faint:#6d737c; --line:#2b2f35;
+    --accent:#7d97ff; --accent-soft:#1f2741; --glob:#5cc0a8; --glob-soft:#17302b; --crop:#e48a5c; --crop-soft:#352219;
+    --teach:#b394f0; --teach-soft:#2a2240; --warn:#e0b25a; --warn-soft:#33291a;
+    --empty:#2a2d31; --code:#22262b; --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121417; --panel:#1a1d21; --ink:#e7e8ea; --muted:#a3a8b0; --faint:#6d737c; --line:#2b2f35;
+  --accent:#7d97ff; --accent-soft:#1f2741; --glob:#5cc0a8; --glob-soft:#17302b; --crop:#e48a5c; --crop-soft:#352219;
+  --teach:#b394f0; --teach-soft:#2a2240; --warn:#e0b25a; --warn-soft:#33291a;
+  --empty:#2a2d31; --code:#22262b; --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.62 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em}
+code{background:var(--code);padding:.08em .38em;border-radius:5px}
+a{color:var(--accent)}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1240px;margin:0 auto;gap:40px;padding:0 24px}
+nav.side{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 0 40px}
+nav.side .brand{font-weight:700;font-size:15px;letter-spacing:-.01em;margin-bottom:4px}
+nav.side .sub{color:var(--muted);font-size:12.5px;margin-bottom:22px}
+nav.side ol{list-style:none;margin:0;padding:0;counter-reset:s}
+nav.side li{counter-increment:s}
+nav.side a{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:13.5px}
+nav.side a::before{content:counter(s,decimal-leading-zero);font:500 11px "JetBrains Mono",monospace;color:var(--faint);min-width:18px}
+nav.side a:hover{background:var(--panel);color:var(--ink)}
+nav.side a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+nav.side a.on::before{color:var(--accent)}
+.theme{margin-top:22px;display:flex;gap:6px}
+.theme button{font-size:12px}
+main{padding:36px 0 120px;min-width:0}
+header.hero h1{font-size:34px;line-height:1.15;letter-spacing:-.025em;margin:0 0 10px}
+header.hero p.lead{font-size:17px;color:var(--muted);max-width:760px;margin:0 0 18px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+.pill.g{background:var(--glob-soft);color:var(--glob)} .pill.c{background:var(--crop-soft);color:var(--crop)} .pill.t{background:var(--teach-soft);color:var(--teach)} .pill.w{background:var(--warn-soft);color:var(--warn)}
+section{padding-top:56px}
+section>h2{font-size:24px;letter-spacing:-.02em;margin:0 0 6px;display:flex;align-items:baseline;gap:12px}
+section>h2 .n{font:500 13px "JetBrains Mono",monospace;color:var(--faint)}
+section>.kicker{color:var(--muted);margin:0 0 18px;max-width:780px}
+h3{font-size:16.5px;margin:26px 0 8px;letter-spacing:-.01em}
+p{max-width:800px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+.card.tight{padding:14px 16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat .v{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.stat .k{font-size:12.5px;color:var(--muted)}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 10px 10px 0;margin:14px 0;font-size:14.5px}
+.note.w{border-color:var(--warn);background:var(--warn-soft)}
+.note.t{border-color:var(--teach);background:var(--teach-soft)}
+.note b{font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+button,.btn{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:10px 0 14px}
+.ctl{display:flex;flex-direction:column;gap:2px;min-width:150px}
+.ctl label{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.ctl label span{font-family:"JetBrains Mono",monospace;color:var(--ink)}
+input[type=range]{accent-color:var(--accent);width:100%}
+details{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel);margin:10px 0}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+details[open] summary{margin-bottom:8px}
+.formula{font-family:"JetBrains Mono",monospace;font-size:13.5px;background:var(--code);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre;line-height:1.55}
+.muted{color:var(--muted)} .small{font-size:13px}
+/* pipeline map */
+.flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:8px}
+.node{border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:10px 11px;cursor:pointer;transition:.15s;min-height:74px}
+.node:hover{border-color:var(--accent);transform:translateY(-1px)}
+.node .t{font-weight:600;font-size:13.5px}
+.node .d{font-size:12px;color:var(--muted);line-height:1.4;margin-top:3px}
+.node.glob{border-top:3px solid var(--glob)} .node.crop{border-top:3px solid var(--crop)} .node.teach{border-top:3px solid var(--teach)} .node.both{border-top:3px solid var(--accent)}
+/* volume strip */
+.strip{display:grid;grid-template-columns:repeat(96,1fr);gap:1px;height:46px;margin:6px 0 2px}
+.strip div{border-radius:2px;position:relative}
+.strip div.win{outline:2px solid var(--ink);outline-offset:-1px;z-index:1}
+.strip div.ctr::after{content:"";position:absolute;left:50%;top:-7px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--ink)}
+.slotlbl{display:grid;grid-template-columns:26fr 22fr 18fr 12fr 18fr;gap:1px;font-size:11.5px;color:var(--muted)}
+.slotlbl div{border-top:2px solid var(--line);padding-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* layer explorer */
+.stack{display:flex;flex-direction:column;gap:6px}
+.layer{display:grid;grid-template-columns:150px 1fr 150px;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--panel);cursor:pointer}
+.layer:hover{border-color:var(--accent)}
+.layer.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.layer .nm{font-weight:600;font-size:13.5px}
+.layer .bar{height:10px;border-radius:5px;background:var(--line);position:relative;overflow:hidden}
+.layer .bar i{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.layer .shape{font:500 12px "JetBrains Mono",monospace;color:var(--muted);text-align:right}
+.layer.dim{opacity:.38}
+.tag{font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;margin-left:6px}
+.tag.sh{background:var(--accent-soft);color:var(--accent)} .tag.gl{background:var(--glob-soft);color:var(--glob)} .tag.cr{background:var(--crop-soft);color:var(--crop)}
+canvas{max-width:100%;display:block}
+.canvasrow{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.canvasbox{display:flex;flex-direction:column;gap:6px;max-width:260px}
+.canvasbox .cap{font-size:12px;color:var(--muted)}
+.bars{display:flex;align-items:flex-end;gap:4px;height:120px;margin:8px 0}
+.bars div{flex:1;background:var(--glob);border-radius:4px 4px 0 0;position:relative;min-height:2px}
+.bars div span{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:10.5px;color:var(--faint)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:"JetBrains Mono",monospace;font-size:12.5px}
+.steps{counter-reset:st;list-style:none;padding:0;margin:8px 0}
+.steps li{counter-increment:st;position:relative;padding:4px 0 10px 36px}
+.steps li::before{content:counter(st);position:absolute;left:0;top:3px;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:12.5px;display:flex;align-items:center;justify-content:center}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:7px;z-index:50;display:none;max-width:280px;line-height:1.4}
+@media (max-width:980px){.layout{grid-template-columns:1fr;gap:0}nav.side{display:none}.flow{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.layer{grid-template-columns:110px 1fr 110px}}
+@media (max-width:600px){.layout{padding:0 16px}header.hero h1{font-size:27px}.strip{height:34px}}
+</style>
+</head>
+<body>
+<div class="tip" id="tip"></div>
+<div class="layout">
+<nav class="side" id="side">
+  <div class="brand">ra, layer by layer</div>
+  <div class="sub">PUB-KD-R ra · r50-GL v4 l4copy · s2026</div>
+  <ol>
+    <li><a href="#map">The whole pipeline</a></li>
+    <li><a href="#data">The d96 volume</a></li>
+    <li><a href="#targets">Teacher targets</a></li>
+    <li><a href="#windows">Picking windows</a></li>
+    <li><a href="#crops">Picking crops</a></li>
+    <li><a href="#aug">Augmentation</a></li>
+    <li><a href="#backbone">ResNet-50, two passes</a></li>
+    <li><a href="#heads">The two heads</a></li>
+    <li><a href="#loss">Loss and readout</a></li>
+    <li><a href="#step">One optimiser step</a></li>
+    <li><a href="#sched">Schedule</a></li>
+    <li><a href="#swa">SWA and BN refresh</a></li>
+    <li><a href="#infer">Inference on Kaggle</a></li>
+    <li><a href="#quirks">Details worth knowing</a></li>
+    <li><a href="#results">What ra scores</a></li>
+    <li><a href="#code">Where it lives in code</a></li>
+  </ol>
+  <div class="theme"><button data-th="light">Light</button><button data-th="dark">Dark</button><button data-th="auto">Auto</button></div>
+</nav>
+
+<main>
+<header class="hero" id="top">
+  <span class="pill t">teacher-student</span><span class="pill g">global path</span><span class="pill c">crop path</span>
+  <h1>How ra is trained, from DICOM-derived pixels to SWA weights</h1>
+  <p class="lead">ra is one ResNet-50 that reads each knee study twice: once as a bag of 3-slice windows (the <b style="color:var(--glob)">global</b> path) and once as zoomed crops around where each finding lives (the <b style="color:var(--crop)">crop</b> path). It learns from the public Raptor CoAtNet's predictions instead of the report labels. Each section below covers one stage, with the exact numbers from the code and an interactive part you can play with.</p>
+  <div class="grid3">
+    <div class="stat"><div class="v">3,524</div><div class="k">training studies (folds 1–5) · fold 0 = 825 held out</div></div>
+    <div class="stat"><div class="v">25 epochs</div><div class="k">441 optimiser steps each · SWA over epochs 21–25</div></div>
+    <div class="stat"><div class="v">LB 0.943</div><div class="k">teacher alone 0.949 · v4 l4copy on label-v2 0.939</div></div>
+  </div>
+</header>
+
+<!-- ============================================================ 1 MAP -->
+<section id="map">
+  <h2><span class="n">01</span>The whole pipeline on one screen</h2>
+  <p class="kicker">Click any box to jump to its section. The colour on top of each box shows which path it belongs to.</p>
+  <div class="flow">
+    <div class="node both" data-go="data"><div class="t">d96 volume</div><div class="d">96 × 384 × 384 uint8 per study, 5 series slots</div></div>
+    <div class="node teach" data-go="targets"><div class="t">Teacher targets</div><div class="d">Raptor 384 + 224, rank order + logit values</div></div>
+    <div class="node glob" data-go="windows"><div class="t">16 windows</div><div class="d">stratified random 3-slice triplets</div></div>
+    <div class="node crop" data-go="crops"><div class="t">10 crops</div><div class="d">MS1 table: 1 of top-4 per finding, ±16 px</div></div>
+    <div class="node both" data-go="aug"><div class="t">Augment</div><div class="d">one draw per study, shared by both paths</div></div>
+    <div class="node both" data-go="backbone"><div class="t">ResNet-50</div><div class="d">stem–layer3 shared, layer 4 split</div></div>
+    <div class="node glob" data-go="heads"><div class="t">Global head</div><div class="d">per-finding attention over windows</div></div>
+    <div class="node crop" data-go="heads"><div class="t">Crop head</div><div class="d">one linear logit per crop</div></div>
+    <div class="node both" data-go="loss"><div class="t">Loss</div><div class="d">BCE(g) + 0.5 · BCE(l on 10 findings)</div></div>
+    <div class="node both" data-go="step"><div class="t">AdamW step</div><div class="d">2 studies × 4 accum, clip 1.0, bf16</div></div>
+    <div class="node both" data-go="swa"><div class="t">SWA + BN refresh</div><div class="d">mean of epochs 21–25, 256-study stats</div></div>
+    <div class="node both" data-go="infer"><div class="t">Inference</div><div class="d">94 windows, self-located crops, fused</div></div>
+  </div>
+  <div class="note"><b>The idea in one paragraph.</b> A whole-knee view is good at "is there effusion" but blurry for "is the medial meniscus torn". So the model also looks at magnified patches where each finding usually shows. Both views share the lower layers of the network (edges, textures, tissue), and each has its own layer 4 and its own head. The training signal is the public Raptor model's opinion (soft probabilities) rather than the report-derived labels: ra is a student copying a stronger teacher.</div>
+</section>
+
+<!-- ============================================================ 2 DATA -->
+<section id="data">
+  <h2><span class="n">02</span>The d96 volume: one array per study</h2>
+  <p class="kicker">Every study is pre-baked into a fixed 96-row stack, the same corpus layout the public 0.949 CoAtNet lineage uses. Training never touches DICOM.</p>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">How a row is made</h3>
+      <ol class="steps small">
+        <li>For each of 5 <b>slots</b> pick a series: the first unused series of that plane, preferring the requested fluid-sensitive flag.</li>
+        <li>Sort its slices by position along the slice normal; pick <i>k</i> slices evenly over 2 %–98 % of the series.</li>
+        <li>One intensity window per series: 2nd–98th percentile over its picked slices (after the modality LUT; MONOCHROME1 inverted).</li>
+        <li>Centred square crop of <b>140 mm</b> (from row spacing), INTER_AREA resize to <b>384 px</b> → 0.365 mm per pixel.</li>
+        <li>Empty slot = rows of zeros. <code>mask[row]</code> = row has any non-zero pixel.</li>
+      </ol>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">Slots (rows per slot)</h3>
+      <table>
+        <tr><th>slot</th><th>plane</th><th>contrast</th><th class="num">rows</th></tr>
+        <tr><td><i class="sw" style="background:var(--s0)"></i>0 SagF</td><td>sagittal</td><td>fluid-sensitive</td><td class="num">26</td></tr>
+        <tr><td>1 SagNF</td><td>sagittal</td><td>non-fluid</td><td class="num">22</td></tr>
+        <tr><td>2 CorF</td><td>coronal</td><td>fluid-sensitive</td><td class="num">18</td></tr>
+        <tr><td>3 CorNF</td><td>coronal</td><td>non-fluid</td><td class="num">12</td></tr>
+        <tr><td>4 Ax</td><td>axial</td><td>any</td><td class="num">18</td></tr>
+      </table>
+      <p class="small muted" style="margin:8px 0 0">Stored as <code>vol_NNN.npy</code> (100 studies × 96 rows × 384 × 384, ~14 MB/study) plus <code>manifest.jsonl</code> with the mask, picks and DICOM geometry. Only 71.8 % of our studies fill all 5 slots; coronal non-fluid is empty in 1,124 of 4,407.</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="controls">
+      <span class="small muted">Toggle a slot off to see how an empty series looks in the stack:</span>
+      <div class="seg" id="slotToggles"></div>
+    </div>
+    <div class="strip" id="strip0"></div>
+    <div class="slotlbl"><div>SagF 0–25</div><div>SagNF 26–47</div><div>CorF 48–65</div><div>CorNF 66–77</div><div>Ax 78–95</div></div>
+    <div class="legend"><span><i style="background:var(--s0)"></i>sagittal fluid</span><span><i style="background:var(--s1)"></i>sagittal non-fluid</span><span><i style="background:var(--s2)"></i>coronal fluid</span><span><i style="background:var(--s3)"></i>coronal non-fluid</span><span><i style="background:var(--s4)"></i>axial</span><span><i style="background:var(--empty)"></i>empty (mask 0)</span></div>
+  </div>
+</section>
+
+<!-- ============================================================ 3 TARGETS -->
+<section id="targets">
+  <h2><span class="n">03</span>Teacher targets: what ra is told to predict</h2>
+  <p class="kicker">ra never sees the report labels in training. Each study's 12 targets come from the public Raptor model (nartaa's CoAtNet-2, trained on all competition data plus OAI), run by us on our own d96 cache.</p>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">The teacher run</h3>
+      <dl class="kv">
+        <dt>384 model</dt><dd>coatnet_rmlp_2_rw_384 @ 320 centre crop</dd>
+        <dt>224 model</dt><dd>coatnet_rmlp_2_rw_224, 0.8 centre crop → 224</dd>
+        <dt>windows</dt><dd>94 centres over the valid rows, triplet c−1..c+1</dd>
+        <dt>TTA</dt><dd>anatomical mirror; p = ½(plain + mirror)</dd>
+        <dt>coverage</dt><dd>all 4,407 cache studies (incl. fold 0)</dd>
+      </dl>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">From two models to one target, per finding</h3>
+      <div class="formula">order  = pct( 0.65·pct(p384) + 0.35·pct(p224) )
+values = σ( 0.65·logit(p384) + 0.35·logit(p224) )
+target[k-th lowest order] = k-th lowest value
+weight = 1 on all 12 cells</div>
+      <p class="small muted" style="margin:8px 0 0">The public blend averages <i>ranks</i>, and a rank is not a probability. So the target keeps the rank blend's <b>ordering</b> exactly and borrows realistic <b>probability values</b> from the same-weight logit blend.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:2px">Try it: eight studies, one finding</h3>
+    <p class="small muted">Edit the teacher probabilities (illustrative numbers). The ranks are computed over these 8 studies; in the real build they're over all 4,407.</p>
+    <div class="tablewrap"><table id="tgtTable"></table></div>
+    <div class="controls"><button id="tgtShuffle">New example</button><span class="small muted" id="tgtNote"></span></div>
+  </div>
+  <div class="note t"><b>What the targets look like.</b> They're soft: mean entropy 0.538 nats per cell (label-v2: 0.260), and only 5 % of cells are below 0.05 or above 0.95 (label-v2: 54 %). Their order agrees with label-v2's confident cells at AUC 0.974. The teacher saw these very studies in training, so on our training set it's partly recalling its own labels. Fold 0 is scored against label-v2, never against the teacher.</div>
+</section>
+
+<!-- ============================================================ 4 WINDOWS -->
+<section id="windows">
+  <h2><span class="n">04</span>Picking windows: 16 in training, 94 at evaluation</h2>
+  <p class="kicker">A "window" is three consecutive rows <code>[c−1, c, c+1]</code> fed to the network as the three colour channels of one image. Centres are drawn over the <b>whole valid range of the 96-row stack</b>, not per series.</p>
+  <div class="card">
+    <div class="controls">
+      <div class="seg"><button id="wTrain" class="on">Training draw (16)</button><button id="wEval">Evaluation (94)</button><button id="wRefresh">BN refresh (16, fixed)</button></div>
+      <button id="wRedraw">Redraw</button>
+      <div class="seg" id="slotToggles2"></div>
+    </div>
+    <div class="strip" id="strip1"></div>
+    <div class="slotlbl"><div>SagF</div><div>SagNF</div><div>CorF</div><div>CorNF</div><div>Ax</div></div>
+    <p class="small" id="wInfo" style="margin:10px 0 0"></p>
+  </div>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">The rule (<code>centres()</code>)</h3>
+      <div class="formula">valid = rows with mask 1   (fewer than 3 → rows 0,1,2)
+lo, hi = first, last valid row
+cs = lo+1 … hi−1            (every interior centre)
+train: split cs into k equal strata,
+       one uniform draw per stratum
+eval:  cs[round(linspace(0, len−1, k))]</div>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">Why this shape</h3>
+      <p class="small" style="margin:0">Stratified draws guarantee every part of the stack (all 5 series) is sampled each step, while random positions inside each stratum mean the model sees different slices every epoch. With a full stack, 94 evaluation centres cover every interior row exactly once. Interior rows of an empty slot <i>are</i> in range: those windows are blank, and windows at a slot boundary mix two series (try toggling CorNF off).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 5 CROPS -->
+<section id="crops">
+  <h2><span class="n">05</span>Picking crops: where each finding lives</h2>
+  <p class="kicker">Ten findings get a magnified view. In <b>training</b> the locations come from a pre-computed table made by a different model (MS1). At <b>inference</b> ra finds them itself (section 13).</p>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">The MS1 crop table (training only)</h3>
+      <p class="small" style="margin:0 0 8px">MS1 = MedSigLIP-448 fine-tuned on label-v2. Per study and finding it stores its <b>4 most-attended windows</b>. On each, it stores the centroid of MS1's gradient × activation map (the in-plane point) and MS1's attention weight. MS1 is used only as a train-time teacher of <i>where</i> to look; it never runs at inference.</p>
+      <table>
+        <tr><th>finding</th><th class="num">box</th><th class="num">mm</th><th class="num">zoom</th></tr>
+        <tr><td>Medial meniscus, Contusion</td><td class="num">128 px</td><td class="num">46.7</td><td class="num">3×</td></tr>
+        <tr><td>ACL, MCL, Lat. meniscus, Med./Lat./PF OA, Baker's, Fracture</td><td class="num">192 px</td><td class="num">70.0</td><td class="num">2×</td></tr>
+        <tr><td>Effusion, Synovitis</td><td class="num" colspan="3">no crop (global only)</td></tr>
+      </table>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">Per study, per step</h3>
+      <ol class="steps small">
+        <li>For each of the 10 findings draw <b>one of its 4</b> windows with probability ∝ MS1 attention.</li>
+        <li>Move its centre by a uniform integer jitter in <b>±16 px</b> on each axis.</li>
+        <li>Clip the centre so the box stays inside the 384 px image.</li>
+        <li>Take rows <code>[S−1, S, S+1]</code> at full 384 px; the box is resampled to <b>384 × 384</b> on the GPU, inside the same augmentation as the global view.</li>
+      </ol>
+      <p class="small muted" style="margin:4px 0 0">So each training study contributes 10 crop images (one per cropped finding, weight 1). Evaluation uses all 4 per finding (40 crops), weighted by the normalised attention.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 6 AUG -->
+<section id="aug">
+  <h2><span class="n">06</span>Augmentation: one random draw per study</h2>
+  <p class="kicker">All windows <i>and</i> all crops of a study share the same mirror, rotation, scale, gamma and gain, so the two views stay consistent. The canvas shows a synthetic slice (not patient data); the three colours are the three neighbouring slices of the window.</p>
+  <div class="card">
+    <div class="controls">
+      <div class="ctl"><label>rotation <span id="vRot">0°</span></label><input type="range" id="aRot" min="-10" max="10" step="0.5" value="0"></div>
+      <div class="ctl"><label>scale <span id="vSc">1.00</span></label><input type="range" id="aSc" min="0.9" max="1.1" step="0.01" value="1"></div>
+      <div class="ctl"><label>shift x <span id="vTx">0.00</span></label><input type="range" id="aTx" min="-0.12" max="0.12" step="0.01" value="0"></div>
+      <div class="ctl"><label>shift y <span id="vTy">0.00</span></label><input type="range" id="aTy" min="-0.12" max="0.12" step="0.01" value="0"></div>
+      <div class="ctl"><label>gamma <span id="vGa">1.00</span></label><input type="range" id="aGa" min="0.78" max="1.28" step="0.01" value="1"></div>
+      <div class="ctl"><label>gain <span id="vGn">1.00</span></label><input type="range" id="aGn" min="0.9" max="1.1" step="0.01" value="1"></div>
+    </div>
+    <div class="controls">
+      <div class="seg"><button id="aCor" class="on">coronal window</button><button id="aSag">sagittal window</button></div>
+      <button id="aMir">mirror: off</button>
+      <button id="aRand">Random draw</button>
+      <button id="aReset">Reset</button>
+    </div>
+    <div class="canvasrow">
+      <div class="canvasbox"><canvas id="cvSrc" width="260" height="260"></canvas><div class="cap">cache rows (384 px) · crop box in orange, ±16 px jitter dashed</div></div>
+      <div class="canvasbox"><canvas id="cvGlob" width="260" height="260"></canvas><div class="cap">global view the network sees (384 px)</div></div>
+      <div class="canvasbox"><canvas id="cvCrop" width="260" height="260"></canvas><div class="cap">crop view (box → 384 px)</div></div>
+    </div>
+  </div>
+  <div class="tablewrap card tight"><table>
+    <tr><th>op</th><th>training range</th><th>applies to</th><th>detail</th></tr>
+    <tr><td>mirror</td><td>p = 0.5</td><td>both</td><td>sagittal: reverse the 3 slice channels (left/right knee = slice order); other planes: flip width. A flipped crop's x-centre is mirrored too.</td></tr>
+    <tr><td>rotation</td><td>U(−10°, +10°)</td><td>both</td><td>same angle for windows and crops</td></tr>
+    <tr><td>scale</td><td>1 ± 0.10</td><td>both</td><td>sampling grid divided by the scale (>1 zooms in)</td></tr>
+    <tr><td>shift</td><td>± 0.12 (grid units) ≈ ±6 % of width</td><td>global only</td><td>crops are positioned by their own centre instead</td></tr>
+    <tr><td>gamma</td><td>exp U(−0.25, 0.25) = 0.78–1.28</td><td>both</td><td>x ← clamp(x,1e-4)^γ</td></tr>
+    <tr><td>gain</td><td>1 ± 0.10</td><td>both</td><td>multiply, then clamp to [0, 1]; then ImageNet mean/std</td></tr>
+  </table></div>
+  <p class="small muted">Evaluation: no augmentation. Global windows are centre-cropped to <b>320 px</b> (not resized, so the same mm per pixel and a smaller field of view); crops are cut from the full 384 px slice with the identity transform.</p>
+</section>
+
+<!-- ============================================================ 7 BACKBONE -->
+<section id="backbone">
+  <h2><span class="n">07</span>ResNet-50, run twice: the shared trunk and the split layer 4</h2>
+  <p class="kicker">One set of stem–layer3 weights serves both views. Layer 4 is duplicated: <code>backbone.layer4</code> for windows and <code>layer4_c</code> for crops (initialised as an ImageNet copy, trained at the backbone LR). Pick a pass to see which modules it uses and the tensor shape after each stage.</p>
+  <div class="card">
+    <div class="controls">
+      <div class="seg"><button class="on" data-pass="gtrain">Global · training (384)</button><button data-pass="geval">Global · evaluation (320)</button><button data-pass="crop">Crop pass (384)</button></div>
+    </div>
+    <div class="stack" id="layerStack"></div>
+    <div class="card tight" id="layerInfo" style="margin-top:12px"></div>
+  </div>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">Dual BatchNorm</h3>
+      <p class="small" style="margin:0">All 53 BatchNorms of the backbone (stem 1 + 16 blocks × 3 + 4 downsample) keep <b>two sets of running statistics</b>: one for window images, one for crop images. The learned scale and shift (γ, β) are shared. Zoomed crops have very different pixel statistics from whole slices, and this stops either view from corrupting the other's normalisation. During training each micro-batch normalises with its own batch statistics: 32 window images, or 20 crop images.</p>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">Parameter count</h3>
+      <table>
+        <tr><td>stem + layers 1–3 (shared)</td><td class="num">8.54 M</td></tr>
+        <tr><td>layer 4 (global)</td><td class="num">14.96 M</td></tr>
+        <tr><td>layer4_c (crops)</td><td class="num">14.96 M</td></tr>
+        <tr><td>global head (LN, attention MLP, W, b)</td><td class="num">0.56 M</td></tr>
+        <tr><td>crop head (LN, V, b)</td><td class="num">0.03 M</td></tr>
+        <tr><th>total</th><th class="num">39.06 M</th></tr>
+      </table>
+      <p class="small muted" style="margin:6px 0 0">ImageNet-1k weights (<code>resnet50.tv_in1k</code>). Roughly 60 % of all parameters sit in the two layer 4s.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 8 HEADS -->
+<section id="heads">
+  <h2><span class="n">08</span>The two heads</h2>
+  <p class="kicker">Both heads start from 2048-d pooled features, LayerNorm-ed. The global head decides, per finding, <b>which windows to listen to</b>; the crop head scores each crop for its own finding only.</p>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px;color:var(--glob)">Global head: attention per finding</h3>
+      <div class="formula">h_k   = LayerNorm(f_k)               k = 1..K windows
+s_k   = MLP(h_k) ∈ ℝ¹²              2048→256 tanh, dropout .2, →12
+a_kf  = softmax_k(s_kf)              over windows, per finding f
+g_f   = ⟨ Σ_k a_kf h_k , W_f ⟩ + b_f</div>
+      <p class="small muted" style="margin:8px 0 0">Twelve separate soft "spotlights" over the same bag of windows. ACL can attend to central sagittal windows while effusion attends to the suprapatellar region, without any slot or position input: the model infers it from the pixels.</p>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px;color:var(--crop)">Crop head: one logit per crop</h3>
+      <div class="formula">h_c   = LayerNorm_l(f_c)            c = crops of the study
+z_c   = ⟨ h_c , V_fid(c) ⟩ + v_fid(c)
+l_f   = Σ_{c: fid(c)=f} w_c · z_c    train: 1 crop, w=1
+                                     eval: 4 crops, w = attention</div>
+      <p class="small muted" style="margin:8px 0 0">The crop path has no attention: the crop was already placed where the finding is. It is linear per finding on its own LayerNorm. Effusion and synovitis have no crops, so l = 0 there.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:2px">Try it: how attention pools 16 windows</h3>
+    <div class="controls">
+      <div class="seg" id="attFind"></div>
+      <div class="ctl" style="min-width:200px"><label>score sharpness <span id="vSharp">1.0</span></label><input type="range" id="attSharp" min="0.2" max="3" step="0.1" value="1"></div>
+      <button id="attRoll">New study</button>
+    </div>
+    <div class="bars" id="attBars"></div>
+    <p class="small" id="attInfo" style="margin-top:26px"></p>
+    <p class="small muted">Illustrative scores. Bar height = attention weight a<sub>k</sub> for the selected finding, x-axis = the 16 window positions from SagF (left) to axial (right). A sharper distribution means the finding's logit is decided by fewer windows.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 9 LOSS -->
+<section id="loss">
+  <h2><span class="n">09</span>Loss and the fused readout</h2>
+  <div class="grid2">
+    <div class="card tight">
+      <div class="formula">BCE(z, y) = softplus(z) − y·z          (soft y allowed)
+
+L_global = Σ_f w·BCE(g_f, y_f) / Σ w        12 findings
+L_local  = Σ_f w·m_f·BCE(l_f, y_f) / Σ w·m_f  m = 1 on the 10 cropped
+L        = 1.0 · L_global + 0.5 · L_local</div>
+      <p class="small muted" style="margin:8px 0 0">All weights are 1 for ra's targets. Both heads are trained against the <b>same</b> teacher target; the crop loss has half weight. The readout is never trained directly.</p>
+    </div>
+    <div class="card tight">
+      <div class="formula">fused_f = σ( ½ (g_f + l_f) )   on the 10 cropped findings
+fused_f = σ( g_f )            on effusion, synovitis</div>
+      <p class="small muted" style="margin:8px 0 0">Averaging <i>logits</i>, not probabilities: if one head is confident and the other unsure, the confident one dominates less than a probability average would let it. The fused head is what's submitted.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:2px">Try it: one cell</h3>
+    <div class="controls">
+      <div class="ctl"><label>teacher target y <span id="vY">0.70</span></label><input type="range" id="lY" min="0" max="1" step="0.01" value="0.7"></div>
+      <div class="ctl"><label>global logit g <span id="vG">0.50</span></label><input type="range" id="lG" min="-6" max="6" step="0.05" value="0.5"></div>
+      <div class="ctl"><label>crop logit l <span id="vL">1.50</span></label><input type="range" id="lL" min="-6" max="6" step="0.05" value="1.5"></div>
+      <button id="lCrop" class="on">cropped finding</button>
+    </div>
+    <div class="grid3" id="lossOut"></div>
+    <p class="small muted" style="margin-top:10px">The minimum of BCE(z, y) is at σ(z) = y, where it equals the target's entropy. A soft target like 0.7 can never be driven to zero loss, which is why ra's train BCE (0.549) sits just above the targets' entropy floor (0.538).</p>
+  </div>
+</section>
+
+<!-- ============================================================ 10 STEP -->
+<section id="step">
+  <h2><span class="n">10</span>One optimiser step, tensor by tensor</h2>
+  <p class="kicker">An optimiser step sees 8 studies: 4 micro-batches of 2 studies, gradients accumulated. Click a row for what happens there.</p>
+  <div class="card">
+    <div class="tablewrap"><table id="stepTable">
+      <tr><th>#</th><th>stage</th><th>tensor</th><th>shape (one micro-batch)</th></tr>
+    </table></div>
+    <div class="note" id="stepNote" style="margin-bottom:0">Click a row.</div>
+  </div>
+  <div class="grid3">
+    <div class="stat"><div class="v">bf16</div><div class="k">autocast for forward; losses in fp32; channels_last tensors</div></div>
+    <div class="stat"><div class="v">clip 1.0</div><div class="k">global gradient-norm clip over all parameters, before each step</div></div>
+    <div class="stat"><div class="v">AdamW</div><div class="k">weight decay 0.05 on every group (norms and biases included)</div></div>
+  </div>
+</section>
+
+<!-- ============================================================ 11 SCHED -->
+<section id="sched">
+  <h2><span class="n">11</span>Learning-rate schedule</h2>
+  <p class="kicker">Two parameter groups share one schedule: <b>backbone + layer4_c at 1e-4</b>, all <b>head</b> parameters at <b>1e-3</b>. One epoch of linear warm-up, then cosine down to a 1 % floor. Hover the chart.</p>
+  <div class="card">
+    <canvas id="cvLR" width="900" height="260" style="width:100%;height:auto"></canvas>
+    <p class="small" id="lrInfo" style="margin:8px 0 0">&nbsp;</p>
+  </div>
+  <div class="formula">steps/epoch = ceil(3524 / (2 × 4)) = 441     total = 11,025     warm-up = 441
+factor(s) = (s+1)/441                                   s < 441
+          = 0.01 + 0.99 · ½(1 + cos(π · (s−441)/(11025−441)))   otherwise</div>
+  <p class="small muted">After every epoch the model predicts fold 0 (825 studies) and a fixed sample of 300 training studies (the "gap" sample), in eval mode, so train–validation gaps and curves are logged. Weights of epochs 21–25 are saved for SWA.</p>
+</section>
+
+<!-- ============================================================ 12 SWA -->
+<section id="swa">
+  <h2><span class="n">12</span>SWA and the BatchNorm refresh</h2>
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">Weight averaging</h3>
+      <p class="small" style="margin:0">The final weights are the plain mean of the epoch 21–25 checkpoints (every floating-point tensor). In the low-LR tail the model wanders around a minimum; the average sits nearer its centre and usually generalises a little better than any single epoch.</p>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">Why a BN refresh is needed</h3>
+      <p class="small" style="margin:0">Averaged weights don't match any epoch's BatchNorm running statistics, so the statistics are recomputed from scratch for the averaged network.</p>
+    </div>
+  </div>
+  <ol class="steps">
+    <li>Reset every BN's global <i>and</i> crop running stats; set momentum = None (exact cumulative average instead of an exponential one).</li>
+    <li>Sample 256 training studies (seeded). Model in train mode; no gradients.</li>
+    <li>Global stats: 16 <b>fixed</b> evenly spaced windows per study at the <b>full 384 px</b> (no 320 centre crop), batch of 2 studies = 32 images.</li>
+    <li>Crop stats: all 4 crops of each finding (40 per study), placed from the MS1 table, through the crop path.</li>
+    <li>Save <code>weights_swa21_25.pt</code> (157 MB); predict fold 0 → <code>val_swa_{fused,global,local}.json</code>.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ 13 INFER -->
+<section id="infer">
+  <h2><span class="n">13</span>Inference on Kaggle: the model places its own crops</h2>
+  <p class="kicker">At test time there is no MS1 table. ra uses its own global attention to decide where to crop. This "self-location" is part of the same forward pass and costs one extra backward through layer-4 features only.</p>
+  <ol class="steps">
+    <li>Rebuild the d96 volume from DICOM with the same builder. 94 evaluation windows, 320 px centre crop, fp16 (fp32 retry if any logit is non-finite).</li>
+    <li>Global pass → layer-4 feature maps <code>[94, 2048, 10, 10]</code>, attention <code>a [94, 12]</code>, global logits <code>g</code>.</li>
+    <li>For each cropped finding take its <b>top-4 windows by attention</b>. On each, compute that window's contribution to the finding's logit (a · LN(GAP(map)) · W), backpropagate to the 10 × 10 map, and take the centroid of positive gradient × activation. That gives the crop centre, mapped back to 384 px coordinates.</li>
+    <li>Cut 4 boxes per finding (128/192 px → 384), run the crop path, weight the 4 crop logits by normalised attention → <code>l</code>.</li>
+    <li>Submit <b>fused</b>: σ(½(g + l)) on 10 findings, σ(g) on effusion and synovitis.</li>
+  </ol>
+  <div class="note w"><b>Train/test placement differs.</b> Training crops follow MS1's table (plus jitter); test crops follow ra's own attention. The jitter and the 1-of-4 draw in training are partly there so the crop path tolerates imperfect placement.</div>
+</section>
+
+<!-- ============================================================ 14 QUIRKS -->
+<section id="quirks">
+  <h2><span class="n">14</span>Details worth knowing</h2>
+  <p class="kicker">These aren't bugs to fix today. They're properties of the recipe that explain some behaviour you'll see in the numbers.</p>
+  <details open><summary>Resolution differs between training and evaluation</summary><p class="small">Training globals are 384 px with augmentation (12 × 12 layer-4 grid). Evaluation globals are a 320 px centre crop (10 × 10): same pixel size, 17 % smaller field of view. The BN refresh measures global statistics at 384, then evaluation runs at 320. This is inherited from the public CoAtNet recipe and kept for comparability.</p></details>
+  <details><summary>Windows cross series boundaries and include empty rows</summary><p class="small">Centres are spread over the whole 96-row stack. A window centred on the first or last row of a slot takes one neighbouring row from the next series, and an empty slot in the middle contributes blank windows. The global attention learns to down-weight these.</p></details>
+  <details><summary>The teacher is in-sample on our training studies</summary><p class="small">Raptor was trained on all competition studies, so its predictions on our folds 1–5 partly reflect its own training labels. On fold 0 it is also in-sample, so "fidelity to the teacher" on fold 0 is descriptive only. This is why fold 0 (scored on label-v2) underrated ra: clear6 −0.002 vs v4, yet LB +0.004.</p></details>
+  <details><summary>Probability scale vs ranking</summary><p class="small">Validation BCE against label-v2 is 0.52–0.53 for ra vs 0.387 for v4, because the teacher's values are softer than label-v2. AUC only cares about order, which is why the LB still went up.</p></details>
+  <details><summary>Only two regularisers besides augmentation</summary><p class="small">Dropout 0.2 inside the attention MLP, and weight decay 0.05. No stochastic depth, no feature dropout. SURPASS-F lane F2 tests adding them (drop path 0.2, dropout 0.3 before the heads, stronger augmentation).</p></details>
+</section>
+
+<!-- ============================================================ 15 RESULTS -->
+<section id="results">
+  <h2><span class="n">15</span>What ra scores</h2>
+  <div class="tablewrap card tight"><table>
+    <tr><th>model</th><th>training targets</th><th class="num">fold-0 clear6</th><th class="num">fidelity to teacher</th><th class="num">public LB</th></tr>
+    <tr><td>v4 l4copy s2026</td><td>label-v2</td><td class="num">0.9735</td><td class="num">0.895</td><td class="num">0.939</td></tr>
+    <tr><td><b>ra</b> (this page)</td><td>Raptor pure</td><td class="num">0.9712</td><td class="num">0.950</td><td class="num"><b>0.943</b></td></tr>
+    <tr><td>rb</td><td>0.7 Raptor + 0.3 label-v2</td><td class="num">0.9743</td><td class="num">0.944–0.946</td><td class="num">0.943</td></tr>
+    <tr><td>Raptor teacher</td><td>(all data + OAI)</td><td class="num muted">in-sample</td><td class="num">—</td><td class="num">0.949</td></tr>
+  </table></div>
+  <div class="grid3">
+    <div class="stat"><div class="v">0.549</div><div class="k">ra train BCE vs target entropy floor 0.538: not underfitting</div></div>
+    <div class="stat"><div class="v">0.991</div><div class="k">agreement between two ra seeds: the gap to the teacher is systematic, not noise</div></div>
+    <div class="stat"><div class="v">105 min</div><div class="k">25 epochs on one A100 (4 lanes per node in parallel)</div></div>
+  </div>
+  <p class="small muted">Transfer ratio: ra closed 0.004 of the 0.010 gap between v4 and the teacher (0.40). Lowest per-finding fidelity: fracture 0.896, ACL 0.92, Baker's 0.94. SURPASS-F asks whether ~9k teacher-labelled fastMRI exams close more of that gap.</p>
+</section>
+
+<!-- ============================================================ 16 CODE -->
+<section id="code">
+  <h2><span class="n">16</span>Where it lives in code</h2>
+  <div class="tablewrap card tight"><table>
+    <tr><th>stage</th><th>file</th><th>symbol</th></tr>
+    <tr><td>cache builder</td><td><code>kaggle/experiment_kernels/coatnet_d96_cache_shard0/run.py</code></td><td>module docstring, <code>SLOTS</code></td></tr>
+    <tr><td>teacher inference</td><td><code>scripts/pubkd_raptor_teacher.py</code></td><td>384 / 224 models, mirror TTA</td></tr>
+    <tr><td>targets</td><td><code>scripts/build_pubkd_targets.py … raptor</code></td><td>→ <code>pubkd_targets_raptor_pure.json</code> (sha 6ed92254)</td></tr>
+    <tr><td>base config</td><td><code>scripts/coatnet_d96_runner.py</code></td><td><code>CFG</code>, phase <code>r50_gl</code>, <code>centres</code>, <code>Studies</code>, <code>Raptor</code></td></tr>
+    <tr><td>crops, augmentation</td><td><code>scripts/r50_gl_runner.py</code></td><td><code>BOX</code>, <code>GL</code>, <code>crop_table</code>, <code>GLStudies</code>, <code>prepare_gl</code>, <code>DualBN</code></td></tr>
+    <tr><td>model, training, SWA</td><td><code>scripts/r50_gl4_runner.py</code></td><td><code>RaptorGL4</code> (<code>V4_ARM=l4copy</code>), <code>train_step_loss</code>, <code>build</code>, <code>bn_refresh</code>, <code>main</code></td></tr>
+    <tr><td>lane config</td><td><code>scripts/meluxina/env/pubkd_kd_ra.env</code></td><td>D96_PHASE=r50_gl, V4_ARM=l4copy, seed 2026, V4_TARGETS</td></tr>
+    <tr><td>Kaggle inference</td><td><code>kaggle/submission_kernels/pubkd_r_ra_submission/submission.py</code></td><td><code>predict_study</code>, <code>locate</code></td></tr>
+  </table></div>
+</section>
+</main>
+</div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const tip = $('#tip');
+function showTip(e, html){ tip.innerHTML = html; tip.style.display = 'block'; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; }
+function hideTip(){ tip.style.display = 'none'; }
+
+/* theme */
+const savedTheme = (() => { try { return localStorage.getItem('ra-theme'); } catch(e){ return null; } })();
+function setTheme(t){ if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('ra-theme', t); } catch(e){}  redrawAll(); }
+$$('.theme button').forEach(b => b.onclick = () => setTheme(b.dataset.th));
+if (savedTheme && savedTheme !== 'auto') document.documentElement.setAttribute('data-theme', savedTheme);
+
+/* nav highlight + map clicks */
+$$('.node').forEach(n => n.onclick = () => document.getElementById(n.dataset.go).scrollIntoView());
+const links = $$('nav.side a'); const secs = links.map(a => document.querySelector(a.getAttribute('href')));
+const obs = new IntersectionObserver(es => { es.forEach(e => { if (e.isIntersecting) { links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); } }); }, {rootMargin: '-35% 0px -60% 0px'});
+secs.forEach(s => s && obs.observe(s));
+
+/* ---------------- d96 strip + windows ---------------- */
+const SIZES = [26, 22, 18, 12, 18], NAMES = ['SagF', 'SagNF', 'CorF', 'CorNF', 'Ax'], COLS = ['--s0','--s1','--s2','--s3','--s4'];
+const SLOT_OF = []; SIZES.forEach((n, s) => { for (let i = 0; i < n; i++) SLOT_OF.push(s); });
+const slotOn = [true, true, true, true, true];
+const mask = () => SLOT_OF.map(s => slotOn[s]);
+function centres(m, k, train, offset){
+  let valid = m.map((v, i) => v ? i : -1).filter(i => i >= 0);
+  if (valid.length < 3) valid = [0, 1, 2];
+  const lo = Math.min(...valid), hi = Math.max(...valid);
+  let cs = []; if (hi - lo >= 2) for (let i = lo + 1; i < hi; i++) cs.push(i); else cs = [Math.max(1, Math.min((lo + hi) >> 1, 94))];
+  if (!train){ const out = []; for (let i = 0; i < k; i++){ const t = k === 1 ? 0 : i * (cs.length - 1) / (k - 1); out.push(cs[Math.round(t)]); } return out; }
+  const out = []; for (let i = 0; i < k; i++){ const a = i * cs.length / k, b = (i + 1) * cs.length / k; const u = offset == null ? Math.random() : offset;
+    out.push(cs[Math.min(Math.floor(a + u * (b - a)), cs.length - 1)]); } return out;
+}
+function makeToggles(id){
+  const el = $(id); el.innerHTML = '';
+  NAMES.forEach((n, s) => { const b = document.createElement('button'); b.textContent = n; b.className = slotOn[s] ? 'on' : '';
+    b.onclick = () => { slotOn[s] = !slotOn[s]; if (!slotOn.some(Boolean)) slotOn[s] = true; makeToggles('#slotToggles'); makeToggles('#slotToggles2'); drawStrip0(); drawWindows(true); }; el.appendChild(b); });
+}
+function cell(i, m){
+  const d = document.createElement('div'); d.style.background = m[i] ? css(COLS[SLOT_OF[i]]) : css('--empty');
+  d.onmousemove = e => showTip(e, `row ${i} · slot ${SLOT_OF[i]} ${NAMES[SLOT_OF[i]]}${m[i] ? '' : ' · <b>empty</b>'}`); d.onmouseleave = hideTip; return d;
+}
+function drawStrip0(){ const el = $('#strip0'); el.innerHTML = ''; const m = mask(); for (let i = 0; i < 96; i++) el.appendChild(cell(i, m)); }
+let wMode = 'train', lastCs = null;
+function drawWindows(redraw){
+  const m = mask(); const k = wMode === 'eval' ? 94 : 16;
+  if (redraw || !lastCs) lastCs = wMode === 'train' ? centres(m, 16, true) : wMode === 'eval' ? centres(m, 94, false) : centres(m, 16, false);
+  const cs = lastCs.map(c => Math.min(Math.max(c, 1), 94));
+  const el = $('#strip1'); el.innerHTML = '';
+  const inWin = new Set(), ctr = new Set(); cs.forEach(c => { ctr.add(c); [c - 1, c, c + 1].forEach(j => inWin.add(j)); });
+  for (let i = 0; i < 96; i++){ const d = cell(i, m); if (wMode !== 'eval' && inWin.has(i)) d.classList.add('win'); if (ctr.has(i)) d.classList.add('ctr'); el.appendChild(d); }
+  const blank = cs.filter(c => !m[c - 1] && !m[c] && !m[c + 1]).length;
+  const cross = cs.filter(c => SLOT_OF[c - 1] !== SLOT_OF[c + 1] || m[c - 1] !== m[c + 1]).length;
+  const uniq = new Set(cs).size;
+  $('#wInfo').innerHTML = `<b>${k}</b> centres (${uniq} distinct rows) · dots mark centres` + (wMode !== 'eval' ? ', outlines the 3 rows each window reads' : '') +
+    ` · <span style="color:var(--warn)">${cross} cross a slot / empty boundary</span> · ${blank} fully blank.` +
+    (wMode === 'train' ? ' Press <b>Redraw</b> for the next step\'s draw.' : wMode === 'refresh' ? ' Fixed positions (eval spacing with 16 windows) used only to re-estimate BN statistics.' : '');
+}
+$('#wTrain').onclick = () => { wMode = 'train'; segOn(['#wTrain','#wEval','#wRefresh'], '#wTrain'); drawWindows(true); };
+$('#wEval').onclick = () => { wMode = 'eval'; segOn(['#wTrain','#wEval','#wRefresh'], '#wEval'); drawWindows(true); };
+$('#wRefresh').onclick = () => { wMode = 'refresh'; segOn(['#wTrain','#wEval','#wRefresh'], '#wRefresh'); drawWindows(true); };
+$('#wRedraw').onclick = () => drawWindows(true);
+function segOn(all, on){ all.forEach(s => $(s).classList.toggle('on', s === on)); }
+
+/* ---------------- teacher targets ---------------- */
+const sig = z => 1 / (1 + Math.exp(-z)), logit = p => { p = Math.min(Math.max(p, 1e-6), 1 - 1e-6); return Math.log(p / (1 - p)); };
+function rankPct(v){ const n = v.length, idx = v.map((x, i) => i).sort((a, b) => v[a] - v[b]); const r = new Array(n); let i = 0;
+  while (i < n){ let j = i; while (j + 1 < n && v[idx[j + 1]] === v[idx[i]]) j++; const avg = (i + j + 2) / 2; for (let q = i; q <= j; q++) r[idx[q]] = avg / n; i = j + 1; } return r; }
+let T = [];
+function newTargets(){ T = []; for (let i = 0; i < 8; i++){ const base = Math.random(); const p384 = Math.min(.98, Math.max(.02, base + (Math.random() - .5) * .25));
+  const p224 = Math.min(.98, Math.max(.02, base + (Math.random() - .5) * .35)); T.push([+p384.toFixed(2), +p224.toFixed(2)]); } drawTargets(); }
+function drawTargets(){
+  const p3 = T.map(t => t[0]), p2 = T.map(t => t[1]);
+  const r3 = rankPct(p3), r2 = rankPct(p2), mix = r3.map((r, i) => .65 * r + .35 * r2[i]), fin = rankPct(mix);
+  const val = T.map(t => sig(.65 * logit(t[0]) + .35 * logit(t[1])));
+  const order = fin.map((f, i) => i).sort((a, b) => fin[a] - fin[b]), sorted = [...val].sort((a, b) => a - b), tgt = new Array(8);
+  order.forEach((i, k) => tgt[i] = sorted[k]);
+  let h = '<tr><th>study</th><th class="num">p384</th><th class="num">p224</th><th class="num">pct 384</th><th class="num">pct 224</th><th class="num">rank blend</th><th class="num">final order</th><th class="num">logit blend</th><th class="num">target</th></tr>';
+  let moved = 0;
+  T.forEach((t, i) => { const diff = Math.abs(tgt[i] - val[i]) > 0.005; if (diff) moved++;
+    h += `<tr><td>S${i + 1}</td><td class="num"><input data-i="${i}" data-j="0" type="number" min="0.01" max="0.99" step="0.01" value="${t[0]}" style="width:66px"></td>` +
+    `<td class="num"><input data-i="${i}" data-j="1" type="number" min="0.01" max="0.99" step="0.01" value="${t[1]}" style="width:66px"></td>` +
+    `<td class="num">${r3[i].toFixed(3)}</td><td class="num">${r2[i].toFixed(3)}</td><td class="num">${mix[i].toFixed(3)}</td><td class="num">${Math.round(fin[i] * 8)}/8</td>` +
+    `<td class="num">${val[i].toFixed(3)}</td><td class="num" style="font-weight:700;color:${diff ? 'var(--teach)' : 'inherit'}">${tgt[i].toFixed(3)}</td></tr>`; });
+  $('#tgtTable').innerHTML = h;
+  $$('#tgtTable input').forEach(inp => inp.onchange = () => { const v = Math.min(.99, Math.max(.01, +inp.value || .5)); T[+inp.dataset.i][+inp.dataset.j] = v; drawTargets(); });
+  $('#tgtNote').innerHTML = moved ? `<span style="color:var(--teach)">${moved} studies</span> get a different value than their own logit blend: the two orderings disagree, and the rank order wins.` : 'Here both orderings agree, so every study keeps its own logit-blend value.';
+}
+$('#tgtShuffle').onclick = newTargets;
+
+/* ---------------- augmentation canvas ---------------- */
+const SRC = 384; const srcCv = [0, 1, 2].map(() => { const c = document.createElement('canvas'); c.width = c.height = SRC; return c; });
+let plane = 'cor';
+function drawSlice(ctx, d, pl){
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, SRC, SRC);
+  const g = (x, y, rx, ry, v, rot) => { ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 2 * Math.PI); ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fill(); ctx.restore(); };
+  ctx.fillStyle = 'rgb(55,55,55)'; ctx.beginPath(); ctx.ellipse(192, 192, 150 + d * 2, 178, 0, 0, 2 * Math.PI); ctx.fill();         // soft tissue
+  if (pl === 'cor'){
+    g(192, 92, 92 + d * 3, 82, 150, 0); g(140, 165, 46, 30, 165); g(244, 165, 46 + d * 2, 30, 165);                                  // femur, condyles
+    g(192, 268, 98 - d * 2, 70, 150); g(192, 214, 100, 12, 210);                                                                  // tibia, cartilage
+    g(124 + d * 6, 194, 26, 7, 30, .15); g(260 - d * 6, 194, 26, 7, 30, -.15);                                                     // menisci (dark)
+    g(192, 190, 10, 30 + d * 4, 95);                                                                                              // ACL-ish
+  } else {
+    g(200, 110, 70, 105 + d * 3, 150, -.2); g(150, 200, 18, 40, 170, .5);                                                         // femur, patella
+    g(205, 285, 72, 80 - d * 2, 150, .05); g(205, 216, 74, 10, 210);                                                               // tibia, cartilage
+    g(228 + d * 5, 210, 22, 6, 30); g(190, 235 + d * 3, 8, 34, 95, -.5);                                                           // meniscus horn, ACL
+    g(120, 140, 26, 40 + d * 8, 235 - d * 10, .3);                                                                                // effusion pocket (bright)
+  }
+  const im = ctx.getImageData(0, 0, SRC, SRC), a = im.data; let s = 1234 + d * 97;                                              // texture
+  for (let i = 0; i < a.length; i += 4){ s = (s * 1103515245 + 12345) & 0x7fffffff; const n = (s % 23) - 11; a[i] = a[i + 1] = a[i + 2] = Math.max(0, Math.min(255, a[i] + n)); }
+  ctx.putImageData(im, 0, 0);
+}
+function buildSources(){ srcCv.forEach((c, i) => drawSlice(c.getContext('2d', {willReadFrequently: true}), i - 1, plane)); }
+function composite(){ const out = document.createElement('canvas'); out.width = out.height = SRC; const o = out.getContext('2d', {willReadFrequently: true}); const res = o.createImageData(SRC, SRC);
+  const ch = srcCv.map(c => c.getContext('2d', {willReadFrequently: true}).getImageData(0, 0, SRC, SRC).data);
+  for (let i = 0; i < res.data.length; i += 4){ res.data[i] = ch[0][i]; res.data[i + 1] = ch[1][i]; res.data[i + 2] = ch[2][i]; res.data[i + 3] = 255; }
+  o.putImageData(res, 0, 0); return out; }
+let A = {rot: 0, sc: 1, tx: 0, ty: 0, ga: 1, gn: 1, mir: false}, comp = null;
+const cropC = {x: 140, y: 190, box: 128};
+function applyTone(ctx, w, h){ if (A.ga === 1 && A.gn === 1) return; const im = ctx.getImageData(0, 0, w, h), a = im.data;
+  for (let i = 0; i < a.length; i += 4) for (let j = 0; j < 3; j++){ const x = Math.max(a[i + j] / 255, 1e-4); a[i + j] = Math.min(1, Math.pow(x, A.ga) * A.gn) * 255; } ctx.putImageData(im, 0, 0); }
+function mirrored(){ if (!A.mir) return comp; const c = document.createElement('canvas'); c.width = c.height = SRC; const x = c.getContext('2d');
+  if (plane === 'sag'){ const d = comp.getContext('2d').getImageData(0, 0, SRC, SRC), r = x.createImageData(SRC, SRC);           // reverse channel order
+    for (let i = 0; i < d.data.length; i += 4){ r.data[i] = d.data[i + 2]; r.data[i + 1] = d.data[i + 1]; r.data[i + 2] = d.data[i]; r.data[i + 3] = 255; } x.putImageData(r, 0, 0); }
+  else { x.translate(SRC, 0); x.scale(-1, 1); x.drawImage(comp, 0, 0); } return c; }
+function drawAug(){
+  if (!comp) return; const src = mirrored();
+  const cs = $('#cvSrc'), cx = cs.getContext('2d'), W = cs.width, k = W / SRC; cx.clearRect(0, 0, W, W); cx.drawImage(comp, 0, 0, W, W);
+  const ccx = (A.mir && plane !== 'sag') ? SRC - cropC.x : cropC.x;
+  cx.strokeStyle = css('--crop'); cx.lineWidth = 2; cx.strokeRect((cropC.x - cropC.box / 2) * k, (cropC.y - cropC.box / 2) * k, cropC.box * k, cropC.box * k);
+  cx.setLineDash([4, 4]); cx.lineWidth = 1; cx.strokeRect((cropC.x - 16) * k, (cropC.y - 16) * k, 32 * k, 32 * k); cx.setLineDash([]);
+  /* global: out (normalised) samples in = (R/sc)·out + t  →  draw src with inverse map */
+  const g = $('#cvGlob'), gx = g.getContext('2d', {willReadFrequently: true}), G = g.width; gx.save(); gx.fillStyle = '#000'; gx.fillRect(0, 0, G, G);
+  const ang = A.rot * Math.PI / 180, half = G / 2;
+  gx.translate(half, half); gx.scale(A.sc, A.sc); gx.rotate(-ang); gx.translate(-A.tx * half, -A.ty * half); gx.drawImage(src, -half, -half, G, G); gx.restore(); applyTone(gx, G, G);
+  /* crop: in = s·(R/sc)·out + p ; s = box/IMG, centred on the crop centre, no shift */
+  const c = $('#cvCrop'), ox = c.getContext('2d', {willReadFrequently: true}), C = c.width, hc = C / 2, s = cropC.box / SRC; ox.save(); ox.fillStyle = '#000'; ox.fillRect(0, 0, C, C);
+  ox.translate(hc, hc); ox.scale(A.sc / s, A.sc / s); ox.rotate(-ang);
+  const px = (ccx / SRC) * 2 - 1, py = (cropC.y / SRC) * 2 - 1; ox.translate(-px * hc, -py * hc); ox.drawImage(src, -hc, -hc, C, C); ox.restore(); applyTone(ox, C, C);
+}
+function syncAug(){ $('#vRot').textContent = A.rot.toFixed(1) + '°'; $('#vSc').textContent = A.sc.toFixed(2); $('#vTx').textContent = A.tx.toFixed(2); $('#vTy').textContent = A.ty.toFixed(2);
+  $('#vGa').textContent = A.ga.toFixed(2); $('#vGn').textContent = A.gn.toFixed(2); $('#aMir').textContent = 'mirror: ' + (A.mir ? 'on' : 'off'); $('#aMir').classList.toggle('on', A.mir);
+  $('#aRot').value = A.rot; $('#aSc').value = A.sc; $('#aTx').value = A.tx; $('#aTy').value = A.ty; $('#aGa').value = A.ga; $('#aGn').value = A.gn; drawAug(); }
+[['#aRot','rot'],['#aSc','sc'],['#aTx','tx'],['#aTy','ty'],['#aGa','ga'],['#aGn','gn']].forEach(([id, k]) => $(id).oninput = e => { A[k] = +e.target.value; syncAug(); });
+$('#aMir').onclick = () => { A.mir = !A.mir; syncAug(); };
+$('#aRand').onclick = () => { const u = () => Math.random() * 2 - 1; A = {rot: +(u() * 10).toFixed(1), sc: +(1 + u() * .1).toFixed(2), tx: +(u() * .12).toFixed(2), ty: +(u() * .12).toFixed(2),
+  ga: +Math.exp(u() * .25).toFixed(2), gn: +(1 + u() * .1).toFixed(2), mir: Math.random() < .5}; syncAug(); };
+$('#aReset').onclick = () => { A = {rot: 0, sc: 1, tx: 0, ty: 0, ga: 1, gn: 1, mir: false}; syncAug(); };
+function setPlane(p){ plane = p; $('#aCor').classList.toggle('on', p === 'cor'); $('#aSag').classList.toggle('on', p === 'sag');
+  Object.assign(cropC, p === 'cor' ? {x: 124, y: 194, box: 128} : {x: 205, y: 225, box: 192}); buildSources(); comp = composite(); drawAug(); }
+$('#aCor').onclick = () => setPlane('cor'); $('#aSag').onclick = () => setPlane('sag');
+
+/* ---------------- layer explorer ---------------- */
+const LAYERS = [
+  {id: 'in', nm: 'input window', ch: 3, st: 1, p: 0, use: 'both', info: '3 neighbouring cache rows as RGB, ÷255, augmentation (training), ImageNet mean/std. channels_last.'},
+  {id: 'stem', nm: 'stem', ch: 64, st: 4, p: 9536, use: 'shared', info: 'conv 7×7 stride 2 (64 ch) → BN → ReLU → max-pool 3×3 stride 2. Edges and blobs. Shared weights; BN uses window or crop statistics depending on the pass.'},
+  {id: 'l1', nm: 'layer1', ch: 256, st: 4, p: 215808, use: 'shared', info: '3 bottleneck blocks (1×1 → 3×3 → 1×1, ×4 expansion). Local textures: cartilage edges, fluid/fat boundaries.'},
+  {id: 'l2', nm: 'layer2', ch: 512, st: 8, p: 1219584, use: 'shared', info: '4 bottleneck blocks, first strided. Larger patterns: meniscal triangles, ligament fibres.'},
+  {id: 'l3', nm: 'layer3', ch: 1024, st: 16, p: 7098368, use: 'shared', info: '6 bottleneck blocks, first strided. Part-level structure. The last stage both passes share.'},
+  {id: 'l4', nm: 'layer4', ch: 2048, st: 32, p: 14964736, use: 'glob', info: '3 bottleneck blocks, first strided. Global pass only. Semantic, finding-level features of whole-knee windows.'},
+  {id: 'l4c', nm: 'layer4_c', ch: 2048, st: 32, p: 14964736, use: 'crop', info: 'An independent copy of layer4 (ImageNet init) used only by crops, trained at the backbone LR with its own BN affine and crop statistics. This split is the "l4copy" in the recipe name.'},
+  {id: 'gap', nm: 'global avg pool', ch: 2048, st: 0, p: 0, use: 'both', info: 'Mean over the spatial grid → one 2048-d vector per window / crop. Then LayerNorm (global: norm, crop: norm_l).'}
+];
+let pass = 'gtrain', selLayer = null;
+function drawLayers(sel){
+  if (sel === undefined) sel = selLayer; selLayer = sel;
+  const res = pass === 'geval' ? 320 : 384, el = $('#layerStack'); el.innerHTML = ''; const maxP = 14964736;
+  LAYERS.forEach(L => {
+    const used = L.use === 'both' || L.use === 'shared' || (L.use === 'glob' && pass !== 'crop') || (L.use === 'crop' && pass === 'crop');
+    const sp = L.st === 0 ? 1 : res / L.st, shape = L.st === 0 ? `${L.ch}` : `${L.ch} × ${sp} × ${sp}`;
+    const tag = L.use === 'shared' ? '<span class="tag sh">shared</span>' : L.use === 'glob' ? '<span class="tag gl">global</span>' : L.use === 'crop' ? '<span class="tag cr">crop</span>' : '';
+    const col = L.use === 'glob' ? 'var(--glob)' : L.use === 'crop' ? 'var(--crop)' : 'var(--accent)';
+    const d = document.createElement('div'); d.className = 'layer' + (used ? '' : ' dim') + (sel === L.id ? ' sel' : '');
+    d.innerHTML = `<div class="nm">${L.nm}${tag}</div><div class="bar" title="parameters"><i style="width:${Math.max(L.p / maxP * 100, L.p ? 1.5 : 0)}%;background:${col}"></i></div><div class="shape">${shape}</div>`;
+    d.onclick = () => { drawLayers(L.id); }; el.appendChild(d);
+    if (sel === L.id){ const bn = L.id === 'in' || L.id === 'gap' ? '—' : (pass === 'crop' ? 'crop running stats' : 'global running stats') + (L.use === 'crop' ? ' (own affine)' : L.use === 'shared' ? ' (shared affine)' : '');
+      $('#layerInfo').innerHTML = `<b>${L.nm}</b> · ${L.p ? (L.p / 1e6).toFixed(2) + ' M params' : 'no params'} · BN: ${bn}<br><span class="small">${L.info}</span>` +
+        (used ? '' : '<br><span class="small" style="color:var(--warn)">Not used in this pass.</span>'); }
+  });
+  if (!sel) $('#layerInfo').innerHTML = `<span class="small muted">${pass === 'crop' ? 'Crop pass: 20 crop images per micro-batch (10 per study), 384 px, through the shared stem–layer3 then layer4_c.' : pass === 'geval' ? 'Evaluation: 94 windows per study at a 320 px centre crop → a 10 × 10 layer-4 grid.' : 'Training: 32 window images per micro-batch (16 per study) at 384 px → a 12 × 12 layer-4 grid.'} Click a layer for details; bar length = parameter count.</span>`;
+}
+$$('[data-pass]').forEach(b => b.onclick = () => { pass = b.dataset.pass; $$('[data-pass]').forEach(x => x.classList.toggle('on', x === b)); drawLayers(); });
+
+/* ---------------- attention demo ---------------- */
+const FIND = [['ACL', 9], ['Med. meniscus', 4], ['Effusion', 1], ['MCL', 10], ['PF OA', 14]];
+let attF = 0, attBase = [];
+function rollAtt(){ attBase = FIND.map(([, c]) => Array.from({length: 16}, (_, k) => 2.6 * Math.exp(-((k - c) ** 2) / (2 * (1.4 + Math.random()) ** 2)) + (Math.random() - .5) * .9)); drawAtt(); }
+function drawAtt(){
+  const sh = +$('#attSharp').value; $('#vSharp').textContent = sh.toFixed(1);
+  const s = attBase[attF].map(v => v * sh), m = Math.max(...s), e = s.map(v => Math.exp(v - m)), Z = e.reduce((a, b) => a + b, 0), a = e.map(v => v / Z);
+  const ent = -a.reduce((t, p) => t + (p > 0 ? p * Math.log(p) : 0), 0), eff = Math.exp(ent), mx = Math.max(...a);
+  const slotOfK = k => { const c = Math.round(1 + k * 93 / 15); return NAMES[SLOT_OF[c]]; };
+  $('#attBars').innerHTML = a.map((p, k) => `<div style="height:${p / mx * 100}%;background:${css(COLS[SLOT_OF[Math.round(1 + k * 93 / 15)]])}" data-k="${k}" data-p="${p}"><span>${k + 1}</span></div>`).join('');
+  $$('#attBars div').forEach(d => { d.onmousemove = e => showTip(e, `window ${+d.dataset.k + 1} (${slotOfK(+d.dataset.k)}) · a = ${(+d.dataset.p).toFixed(3)}`); d.onmouseleave = hideTip; });
+  const top = a.map((p, k) => [p, k]).sort((x, y) => y[0] - x[0]).slice(0, 3);
+  $('#attInfo').innerHTML = `<b>${FIND[attF][0]}</b>: the top 3 windows carry <b>${(top.reduce((t, x) => t + x[0], 0) * 100).toFixed(0)} %</b> of the weight (${top.map(x => '#' + (x[1] + 1) + ' ' + slotOfK(x[1])).join(', ')}). Effective number of windows = e<sup>entropy</sup> = <b>${eff.toFixed(1)}</b> of 16.`;
+}
+(() => { const el = $('#attFind'); FIND.forEach(([n], i) => { const b = document.createElement('button'); b.textContent = n; b.className = i === 0 ? 'on' : '';
+  b.onclick = () => { attF = i; [...el.children].forEach((x, j) => x.classList.toggle('on', j === i)); drawAtt(); }; el.appendChild(b); }); })();
+$('#attSharp').oninput = drawAtt; $('#attRoll').onclick = rollAtt;
+
+/* ---------------- loss demo ---------------- */
+let cropped = true;
+const sp = z => Math.max(z, 0) + Math.log1p(Math.exp(-Math.abs(z))), bce = (z, y) => sp(z) - y * z, H = y => (y <= 0 || y >= 1) ? 0 : -(y * Math.log(y) + (1 - y) * Math.log(1 - y));
+function drawLoss(){
+  const y = +$('#lY').value, g = +$('#lG').value, l = +$('#lL').value; $('#vY').textContent = y.toFixed(2); $('#vG').textContent = g.toFixed(2); $('#vL').textContent = l.toFixed(2);
+  const bg = bce(g, y), bl = cropped ? bce(l, y) : 0, tot = bg + .5 * bl, fused = cropped ? sig(.5 * (g + l)) : sig(g);
+  const box = (v, k, c) => `<div class="stat"><div class="v" style="color:${c || 'inherit'}">${v}</div><div class="k">${k}</div></div>`;
+  $('#lossOut').innerHTML = box(bg.toFixed(3), `BCE global (σ(g) = ${sig(g).toFixed(3)})`, 'var(--glob)') +
+    box(cropped ? bl.toFixed(3) : '—', cropped ? `BCE crop (σ(l) = ${sig(l).toFixed(3)}) × 0.5` : 'no crop for this finding', 'var(--crop)') +
+    box(tot.toFixed(3), `this cell's loss · floor 1.5 × H(y) = ${(H(y) * (cropped ? 1.5 : 1)).toFixed(3)} · fused p = ${fused.toFixed(3)}`);
+}
+['#lY','#lG','#lL'].forEach(id => $(id).oninput = drawLoss);
+$('#lCrop').onclick = () => { cropped = !cropped; $('#lCrop').classList.toggle('on', cropped); $('#lCrop').textContent = cropped ? 'cropped finding' : 'effusion / synovitis'; drawLoss(); };
+
+/* ---------------- one step table ---------------- */
+const STEPS = [
+  ['load', 'windows (uint8)', '[2, 16, 3, 384, 384]', 'Workers read 16 window triplets per study from the memory-mapped cache, plus the study\'s 12 targets and weights.'],
+  ['load', 'crop slices (uint8)', '[2, 10, 3, 384, 384]', 'For each of the 10 cropped findings: the full 384 px rows S−1..S+1 of the drawn MS1 window, plus centre, finding id and weight 1. The box is cut on the GPU.'],
+  ['augment', 'global images', '[32, 3, 384, 384]', 'Mirror, then one affine grid_sample per study (rotation, scale, shift), gamma, gain, ImageNet normalisation. bf16 autocast from here.'],
+  ['augment', 'crop images', '[20, 3, 384, 384]', 'Same mirror / rotation / scale / gamma / gain as the study\'s windows; grid = box/384 × rotation, centred on the jittered crop centre, resampled to 384.'],
+  ['backbone', 'global features', '[32, 2048] → [2, 16, 2048]', 'Shared stem–layer3 + layer4, global BN statistics, global average pool, LayerNorm.'],
+  ['backbone', 'crop features', '[20, 2048] → [2, 10, 2048]', 'Shared stem–layer3 with crop BN statistics, then layer4_c, pool, LayerNorm_l.'],
+  ['heads', 'g logits', '[2, 12]', 'Attention MLP → softmax over the 16 windows per finding → pooled feature · W_f + b_f.'],
+  ['heads', 'l logits', '[2, 12]', 'One logit per crop on its own finding (scatter-added into 12 columns; effusion and synovitis stay 0).'],
+  ['loss', 'scalar', '[]', 'L = BCE(g, y) + 0.5 · BCE(l, y) on the 10 cropped findings; divided by accum = 4 and backpropagated (gradients add up).'],
+  ['step', 'every 4th micro-batch', '8 studies', 'Clip the global gradient norm to 1.0, AdamW update, scheduler tick, zero the gradients.']
+];
+(() => { const t = $('#stepTable'); STEPS.forEach((s, i) => { const r = document.createElement('tr'); r.style.cursor = 'pointer';
+  r.innerHTML = `<td class="mono">${i + 1}</td><td>${s[0]}</td><td>${s[1]}</td><td class="mono">${s[2]}</td>`;
+  r.onclick = () => { [...t.querySelectorAll('tr')].forEach(x => x.style.background = ''); r.style.background = 'var(--accent-soft)'; $('#stepNote').innerHTML = `<b>${s[1]}</b> · ${s[3]}`; }; t.appendChild(r); }); })();
+
+/* ---------------- LR chart ---------------- */
+const SPE = 441, TOT = SPE * 25, WARM = SPE, FL = .01;
+const fac = s => s < WARM ? (s + 1) / WARM : FL + (1 - FL) * .5 * (1 + Math.cos(Math.PI * Math.min(1, (s - WARM) / Math.max(1, TOT - WARM))));
+let lrHover = null;
+function drawLR(){
+  const c = $('#cvLR'), x = c.getContext('2d'), W = c.width, Ht = c.height, L = 60, R = 18, Tp = 16, B = 34;
+  x.clearRect(0, 0, W, Ht); x.font = '12px Inter, sans-serif'; x.fillStyle = css('--muted');
+  const X = s => L + (W - L - R) * s / TOT, ylo = Math.log10(5e-7), yhi = Math.log10(1.5e-3), Y = v => Tp + (Ht - Tp - B) * (1 - (Math.log10(v) - ylo) / (yhi - ylo));
+  x.fillStyle = css('--accent-soft'); x.fillRect(X(20 * SPE), Tp, X(TOT) - X(20 * SPE), Ht - Tp - B);
+  x.fillStyle = css('--accent'); x.fillText('SWA 21–25', X(20 * SPE) + 6, Tp + 14);
+  x.strokeStyle = css('--line'); x.lineWidth = 1; x.fillStyle = css('--muted');
+  [1e-6, 1e-5, 1e-4, 1e-3].forEach(v => { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(v.toExponential(0), 8, Y(v) + 4); });
+  for (let e = 0; e <= 25; e += 5){ x.fillText(String(e), X(e * SPE) - 4, Ht - 12); }
+  x.fillText('epoch', W - R - 34, Ht - 12);
+  [[1e-3, '--crop', 'heads 1e-3'], [1e-4, '--glob', 'backbone + layer4_c 1e-4']].forEach(([base, col, lab], j) => {
+    x.strokeStyle = css(col); x.lineWidth = 2; x.beginPath(); for (let s = 0; s <= TOT; s += 15){ const px = X(s), py = Y(base * fac(s)); s ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke();
+    x.fillStyle = css(col); x.fillText(lab, X(2 * SPE), Y(base * fac(2 * SPE)) - 8); });
+  if (lrHover != null){ x.strokeStyle = css('--faint'); x.setLineDash([3, 3]); x.beginPath(); x.moveTo(X(lrHover), Tp); x.lineTo(X(lrHover), Ht - B); x.stroke(); x.setLineDash([]); }
+}
+$('#cvLR').onmousemove = e => { const c = e.target, r = c.getBoundingClientRect(), px = (e.clientX - r.left) * c.width / r.width; const s = Math.round(Math.min(TOT, Math.max(0, (px - 60) / (c.width - 78) * TOT)));
+  lrHover = s; drawLR(); const ep = Math.floor(s / SPE) + 1;
+  $('#lrInfo').innerHTML = `step <b>${s.toLocaleString()}</b> · epoch <b>${Math.min(ep, 25)}</b> · factor ${fac(s).toFixed(4)} · backbone <span class="mono">${(1e-4 * fac(s)).toExponential(2)}</span> · heads <span class="mono">${(1e-3 * fac(s)).toExponential(2)}</span>${ep >= 21 ? ' · <b style="color:var(--accent)">SWA epoch</b>' : ''}`; };
+$('#cvLR').onmouseleave = () => { lrHover = null; drawLR(); };
+
+function redrawAll(){ drawStrip0(); drawWindows(false); drawAug(); drawLR(); drawAtt(); drawLayers(); }
+makeToggles('#slotToggles'); makeToggles('#slotToggles2'); newTargets(); setPlane('cor'); rollAtt(); drawLoss(); drawLayers(); drawStrip0(); drawWindows(true); drawLR(); syncAug();
+})();
+</script>
+</body>
+</html>

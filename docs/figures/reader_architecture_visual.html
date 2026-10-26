@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knee Reader Layers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one row per pipeline stage, three model lanes side by side (0.925 | Exp 1c | Exp 2a), every lane drawn to the same scale. */
+:root {
+  --bg: #f3f5f6; --panel: #ffffff; --fg: #15212a; --muted: #5d6c78; --line: #d3dbe0; --grid: #e6ebee;
+  --chg: #0e7383; --chg-soft: #dbeff1; --new: #b4480f; --new-soft: #fbe7da;
+  --s0: #1f7a8c; --s1: #7fb8c4; --s2: #c9692c; --s3: #e7b48f; --s4: #6b55a8; --off: #c7d0d6;
+  --hot: #c2410c; --cold: #e9eef1;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f161b; --panel: #162129; --fg: #e2e9ed; --muted: #97a8b4; --line: #2b3a44; --grid: #22303a;
+  --chg: #4fc1cf; --chg-soft: #133a40; --new: #f59a5c; --new-soft: #3b2417;
+  --s0: #3aa6b9; --s1: #2c6a76; --s2: #e08a4f; --s3: #8a5a3a; --s4: #9a86d6; --off: #3a4852;
+  --hot: #f59a5c; --cold: #1f2b33; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f161b; --panel: #162129; --fg: #e2e9ed; --muted: #97a8b4; --line: #2b3a44; --grid: #22303a;
+  --chg: #4fc1cf; --chg-soft: #133a40; --new: #f59a5c; --new-soft: #3b2417;
+  --s0: #3aa6b9; --s1: #2c6a76; --s2: #e08a4f; --s3: #8a5a3a; --s4: #9a86d6; --off: #3a4852;
+  --hot: #f59a5c; --cold: #1f2b33; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 15px/1.5 var(--body); }
+.wrap { max-width: none; margin: 0; padding-inline: 20px; padding-block: 32px 64px; display: grid; gap: 22px; }
+h1 { font: 800 clamp(1.8rem, 3.6vw, 2.4rem)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; }
+p { margin: 0; max-width: 75ch; }
+.lead { color: var(--muted); font-size: 1.05rem; }
+.mono { font-family: var(--mono); font-size: 0.85em; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; position: sticky; top: 0; z-index: 3;
+  background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+.controls span { font: 600 0.75rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-right: 4px; }
+.controls button { font: 600 0.85rem/1 var(--body); padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--fg); cursor: pointer; }
+.controls button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.controls button:focus-visible { outline: 2px solid var(--chg); outline-offset: 2px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.board { overflow-x: auto; }
+.grid { display: grid; grid-template-columns: 220px repeat(3, minmax(0, 1fr)); min-width: 1150px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.cell { padding: 14px; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); min-width: 0; display: grid; gap: 8px; align-content: start; }
+.cell:nth-child(4n+1) { border-left: 0; }
+.head { background: var(--panel); }
+.head h2 { font: 800 1.05rem/1.2 var(--display); margin: 0; }
+.head small { font: 400 0.78rem/1.3 var(--mono); color: var(--muted); }
+.stage h3 { font: 600 0.78rem/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin: 0; color: var(--fg); }
+.stage p { font-size: 0.86rem; color: var(--muted); }
+.cell.chg { background: var(--chg-soft); }
+.cell.new { background: var(--new-soft); }
+.note { font-size: 0.84rem; color: var(--fg); }
+.note b { font-weight: 600; }
+.same { font: 400 0.82rem/1.4 var(--mono); color: var(--muted); }
+svg { display: block; width: 100%; max-width: 640px; height: auto; overflow: visible; }
+svg text { font-family: var(--mono); fill: var(--fg); }
+svg .mut { fill: var(--muted); }
+.s0 { fill: var(--s0); } .s1 { fill: var(--s1); } .s2 { fill: var(--s2); } .s3 { fill: var(--s3); } .s4 { fill: var(--s4); }
+.off { fill: var(--off); } .gridline { stroke: var(--grid); } .ln { stroke: var(--line); } .fgs { stroke: var(--fg); }
+.panelfill { fill: var(--panel); } .chgs { stroke: var(--chg); } .news { stroke: var(--new); } .newf { fill: var(--new); } .chgf { fill: var(--chg); }
+.illus { font: 400 0.75rem/1.3 var(--mono); color: var(--muted); }
+.cell.zoomable { cursor: zoom-in; }
+.cell.zoomable:hover { outline: 2px solid var(--chg); outline-offset: -2px; }
+dialog.zoom { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--fg);
+  width: min(94vw, 1500px); max-height: 92vh; padding: 20px 24px; overflow: auto; }
+dialog.zoom::backdrop { background: rgb(0 0 0 / 0.6); }
+dialog.zoom svg { max-width: none; width: 100%; }
+dialog.zoom .note { font-size: 1.05rem; margin-top: 12px; }
+dialog.zoom .zt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+dialog.zoom .zt b { font: 800 1.1rem/1.2 var(--display); }
+dialog.zoom button { font: 600 0.85rem/1 var(--body); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+footer { color: var(--muted); font-size: 0.82rem; }
+@media (prefers-reduced-motion: no-preference) { svg .fade { transition: opacity .2s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Knee Reader Layers</h1>
+    <p class="lead">One knee MRI study passing through three readers, layer by layer and drawn to scale: the original ResNet-50 recipe (public 0.925),
+      the d96 recipe Exp 1c (0.933, same backbone and labels), and the proposed Exp 2a (1c plus context between slices).
+      Shaded cells mark what changed: <b style="color:var(--chg)">teal</b> from 0.925 to 1c, <b style="color:var(--new)">orange</b> new in 2a.</p>
+    <div class="legend">
+      <span><i style="background:var(--s0)"></i>Sagittal fluid</span><span><i style="background:var(--s1)"></i>Sagittal non-fluid</span>
+      <span><i style="background:var(--s2)"></i>Coronal fluid</span><span><i style="background:var(--s3)"></i>Coronal non-fluid</span>
+      <span><i style="background:var(--s4)"></i>Axial</span><span><i style="background:var(--off)"></i>slice not used</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Finding to trace">
+    <span>Trace a finding</span>
+    <div id="findings" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+
+  <div class="board"><div class="grid" id="grid"></div></div>
+
+  <footer>Shapes, slot sizes, crops, pooling rules and layer sizes are the real configurations
+    (<span class="mono">hpo_v31_d2_resnet50_fold0</span>, <span class="mono">coatnet_d96_runner.py</span> D96_PHASE=r50, and the Exp 2a plan).
+    The window scores, attention weights and probabilities are <b>illustrative</b>: generated from a simple "where would this finding show up" rule
+    so you can see how each pooling behaves. They are not read from the trained models.</footer>
+</div>
+<dialog class="zoom" id="zoom" aria-label="Enlarged cell"><div class="zt"><b id="zoomTitle"></b><button type="button" id="zoomClose">Close (Esc)</button></div><div id="zoomBody"></div></dialog>
+
+<script>
+const T = ["ACL","MCL","Medial Meniscus","Lateral Meniscus","Medial OA","Lateral OA","PF OA","Effusion","Synovitis","Baker's","Contusion","Fracture"];
+const SLOTNAME = ["Sag fluid","Sag non-fluid","Cor fluid","Cor non-fluid","Axial"];
+// Real slot layouts. Stack position p in [0,1]: sagittal 0 = medial edge, 1 = lateral edge (anatomical, after knee-side fix);
+// coronal 0 = front, 1 = back; axial 0 = top (suprapatellar), 1 = bottom.
+const R925 = { slots: [{s:0,n:12},{s:2,n:12},{s:4,n:12},{s:1,n:12}], band: [0.2, 0.8], native: 30 };
+const D96  = { slots: [{s:0,n:26},{s:1,n:22},{s:2,n:18},{s:3,n:12},{s:4,n:18}], band: [0.02, 0.98], native: 30 };
+
+function windowsOf(cfg, count) {
+  // one entry per window: slot and stack position of its centre slice
+  const slices = [];
+  cfg.slots.forEach(sl => { for (let i = 0; i < sl.n; i++) slices.push({ s: sl.s, p: cfg.band[0] + (cfg.band[1] - cfg.band[0]) * (sl.n === 1 ? .5 : i / (sl.n - 1)) }); });
+  if (count >= slices.length) return slices;
+  const out = [];  // d96: 94 windows from 96 slices (centres 1..94 of the volume)
+  for (let k = 0; k < count; k++) out.push(slices[Math.min(slices.length - 1, 1 + Math.round(k * (slices.length - 3) / (count - 1)))]);
+  return out;
+}
+const W925 = windowsOf(R925, 48), W96 = windowsOf(D96, 94);
+
+// Illustrative evidence: where each finding tends to be visible (slot preference x stack position bump)
+const G = (p, c, w) => Math.exp(-((p - c) ** 2) / (2 * w * w));
+const WHERE = {
+  "ACL":              (s, p) => (s <= 1) * G(p, .5, .07),
+  "MCL":              (s, p) => (s === 2 ? 1 : s === 3 ? .6 : 0) * G(p, .45, .18) + (s === 4) * .3 * G(p, .55, .2),
+  "Medial Meniscus":  (s, p) => (s <= 1) * G(p, .18, .08) + (s === 2) * .6 * G(p, .6, .2),
+  "Lateral Meniscus": (s, p) => (s <= 1) * G(p, .82, .08) + (s === 2) * .6 * G(p, .6, .2),
+  "Medial OA":        (s, p) => (s <= 1) * G(p, .15, .09) + (s >= 2 && s <= 3) * .7 * G(p, .5, .2),
+  "Lateral OA":       (s, p) => (s <= 1) * G(p, .87, .07) + (s >= 2 && s <= 3) * .7 * G(p, .5, .2),
+  "PF OA":            (s, p) => (s === 4) * G(p, .35, .12) + (s <= 1) * .6 * G(p, .5, .1),
+  "Effusion":         (s, p) => (s === 0) * G(p, .5, .15) + (s === 4) * .8 * G(p, .12, .1),
+  "Synovitis":        (s, p) => (s === 0) * G(p, .5, .09) + (s === 4) * .5 * G(p, .4, .15),
+  "Baker's":          (s, p) => (s === 4) * G(p, .55, .12) + (s === 0) * .6 * G(p, .25, .08),
+  "Contusion":        (s, p) => (s === 0 || s === 2) * (.6 * G(p, .3, .1) + .6 * G(p, .75, .1)),
+  "Fracture":         (s, p) => (s === 1 || s === 3) * (.7 * G(p, .35, .12) + .5 * G(p, .7, .1)),
+};
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function evidence(ws, f, seed) { const r = rng(seed + T.indexOf(f) * 97); return ws.map(w => WHERE[f](w.s, w.p) + 0.12 * r()); }
+
+// ---------- svg helpers
+const svg = (w, h, body, label) => `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${label}">${body}</svg>`;
+const rect = (x, y, w, h, cls, extra = "") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="${cls}" ${extra}/>`;
+const txt = (x, y, s, extra = "") => `<text x="${x}" y="${y}" font-size="10" ${extra}>${s}</text>`;
+const heat = v => `fill:color-mix(in srgb, var(--hot) ${Math.round(Math.max(0, Math.min(1, v)) * 100)}%, var(--cold))`;
+
+// ---------- stage drawings
+function volume(cfg, total) {
+  const rows = cfg.slots, w = 300, rh = 22;
+  let b = "";
+  rows.forEach((sl, i) => {
+    const y = 8 + i * rh;
+    b += txt(0, y + 10, SLOTNAME[sl.s], 'class="mut"');
+    for (let k = 0; k < cfg.native; k++) b += rect(92 + k * 6.6, y, 5, 13, "off");
+    for (let k = 0; k < sl.n; k++) {
+      const p = cfg.band[0] + (cfg.band[1] - cfg.band[0]) * (sl.n === 1 ? .5 : k / (sl.n - 1));
+      b += rect(92 + p * (cfg.native - 1) * 6.6, y, 5, 13, "s" + sl.s);
+    }
+  });
+  const y = 8 + rows.length * rh + 6;
+  b += `<line x1="${92 + cfg.band[0] * 191}" x2="${92 + cfg.band[1] * 191 + 5}" y1="${y}" y2="${y}" class="fgs" stroke-width="1"/>`;
+  b += txt(92, y + 13, `kept ${Math.round(cfg.band[0] * 100)}–${Math.round(cfg.band[1] * 100)}% of each ~30-slice stack · ${total} slices`, 'class="mut"');
+  return svg(w, y + 18, b, "slices selected per series");
+}
+function pixels(mmPerPx, label, crop) {
+  // left: field of view square; right: 5 mm zoom with real pixel grid and a 2.5 mm cartilage band
+  const n = Math.round(5 / mmPerPx), z = 112, c = z / n;
+  let b = rect(0, 0, 112, 112, "panelfill", 'stroke="currentColor" style="stroke:var(--fg)"');
+  b += txt(4, 126, "140 mm", 'class="mut"');
+  if (crop) { const s = 112 * crop / 140, o = (112 - s) / 2; b += `<rect x="${o}" y="${o}" width="${s}" height="${s}" fill="none" class="chgs" stroke-dasharray="4 3" stroke-width="1.5"/>` + txt(o + 3, o + 12, "eval ~117 mm"); }
+  b += rect(46, 46, 20, 20, "", 'fill="none" style="stroke:var(--hot)" stroke-width="1.5"');
+  b += `<line x1="66" y1="56" x2="150" y2="56" style="stroke:var(--hot)" stroke-dasharray="2 2"/>`;
+  b += `<g transform="translate(152,0)">`;
+  for (let i = 0; i <= n; i++) b += `<line x1="${i * c}" x2="${i * c}" y1="0" y2="${z}" class="gridline"/><line y1="${i * c}" y2="${i * c}" x1="0" x2="${z}" class="gridline"/>`;
+  const bandTop = z * 0.4, bandH = z * 2.5 / 5;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const cy = j * c + c / 2; if (cy > bandTop && cy < bandTop + bandH) b += rect(i * c + .5, j * c + .5, c - 1, c - 1, "s2", 'opacity=".55"'); }
+  b += rect(0, 0, z, z, "", 'fill="none" style="stroke:var(--hot)" stroke-width="1.5"');
+  b += txt(0, 126, `5 mm = ${n} px · ${label}`) + txt(0, 140, `2.5 mm cartilage ≈ ${Math.round(2.5 / mmPerPx)} px thick`, 'class="mut"');
+  b += `</g>`;
+  return svg(300, 146, b, "pixel size");
+}
+function windowStack(chs, size) {
+  let b = "";
+  chs.forEach((c, i) => {
+    const x = i * 30, y = i * 10;
+    b += rect(x, y, 70, 70, c.cls, `opacity="${c.op || 1}" style="stroke:var(--panel)" stroke-width="2"`);
+    b += txt(x + 74, y + 12, c.label, 'class="mut"');
+  });
+  const h = (chs.length - 1) * 10 + 86;
+  b += txt(0, h, `${chs.length} × ${size} × ${size}`);
+  return svg(300, h + 4, b, "one input window");
+}
+function tiles(ws, cols) {
+  const s = 9, g = 2; let b = "";
+  ws.forEach((w, i) => { b += rect((i % cols) * (s + g), Math.floor(i / cols) * (s + g), s, s, "s" + w.s); });
+  const rows = Math.ceil(ws.length / cols);
+  b += txt(0, rows * (s + g) + 12, `${ws.length} windows per study at evaluation`);
+  return svg(300, rows * (s + g) + 16, b, "windows per study");
+}
+function resnet(res) {
+  const st = [["input", res, 3], ["stem /4", res / 4, 64], ["layer1", res / 4, 256], ["layer2", res / 8, 512], ["layer3", res / 16, 1024], ["layer4", res / 32, 2048]];
+  const scale = 0.5; let x = 0, b = "";
+  st.forEach(([name, r, c], i) => {
+    const side = Math.max(6, r * scale * (res === 224 ? 1 : 1)) * 0.62, depth = 4 + Math.log2(c) * 1.6;
+    const y = 120 - side;
+    b += `<g><rect x="${x + depth}" y="${y - depth}" width="${side}" height="${side}" class="${i === 0 ? 's0' : 'chgf'}" opacity="${i === 0 ? .35 : .18}"/>`;
+    b += `<rect x="${x}" y="${y}" width="${side}" height="${side}" class="${i === 0 ? 's0' : 'chgf'}" opacity="${i === 0 ? .6 : .45}"/>`;
+    b += `<line x1="${x}" y1="${y}" x2="${x + depth}" y2="${y - depth}" class="ln"/><line x1="${x + side}" y1="${y}" x2="${x + side + depth}" y2="${y - depth}" class="ln"/></g>`;
+    b += txt(x, 136, name, 'class="mut"') + txt(x, 149, `${r}²×${c}`);
+    x += side + depth + 10;
+  });
+  b += `<line x1="${x - 4}" y1="100" x2="${x + 6}" y2="100" class="fgs"/>` + rect(x + 8, 40, 7, 80, "chgf") + txt(x + 2, 136, "pool", 'class="mut"') + txt(x - 4, 149, "2048");
+  return svg(x + 30, 154, b, "ResNet-50 feature maps");
+}
+function logitGrid(ws, f) {
+  // 0.925: 12 logits per window; rows = findings, cols = windows
+  const cw = 5.6, ch = 9; let b = "";
+  T.forEach((t, r) => {
+    const e = evidence(ws, t, 11);
+    b += txt(0, r * ch + 8, t.length > 10 ? t.slice(0, 10) + "…" : t, `font-size="8" class="${t === f ? '' : 'mut'}" ${t === f ? 'font-weight="600"' : ''}`);
+    e.forEach((v, i) => { b += `<rect x="${58 + i * cw}" y="${r * ch}" width="${cw - .6}" height="${ch - 1}" style="${heat(v)}" ${t === f ? '' : 'opacity=".45"'}/>`; });
+  });
+  ws.forEach((w, i) => { b += rect(58 + i * cw, T.length * ch + 2, cw - .6, 4, "s" + w.s); });
+  b += txt(58, T.length * ch + 18, `48 windows × 12 logits (Linear 2048→12 on every window)`, 'class="mut"');
+  return svg(330, T.length * ch + 22, b, "per-window logits");
+}
+function tokens(ws, withPos) {
+  const cw = 3.2; let b = "";
+  ws.forEach((w, i) => {
+    b += rect(i * cw, 0, cw - .7, 46, "s" + w.s, 'opacity=".8"');
+    if (withPos) b += `<rect x="${i * cw}" y="50" width="${cw - .7}" height="8" style="fill:color-mix(in srgb, var(--new) ${Math.round(w.p * 100)}%, var(--cold))"/>`;
+  });
+  b += txt(0, withPos ? 72 : 60, withPos ? "94 tokens × 2048 · + slot colour + position (light→dark = 0→1)" : "94 tokens × 2048-d (one per window)", 'class="mut"');
+  return svg(310, withPos ? 76 : 64, b, "window feature tokens");
+}
+function contextDiagram(ws, f) {
+  // arcs from the strongest token for this finding to its strongest tokens in OTHER slots
+  const e = evidence(ws, f, 5), cw = 3.2, base = 92;
+  const top = e.indexOf(Math.max(...e));
+  const others = e.map((v, i) => [v, i]).filter(([, i]) => ws[i].s !== ws[top].s).sort((a, b) => b[0] - a[0]).slice(0, 6);
+  let b = rect(0, 0, 310, 40, "", 'fill="none" style="stroke:var(--new)" rx="6"');
+  b += txt(10, 17, "Transformer × 2 · 2048→512 · 8 heads · FFN 1024", 'font-weight="600"');
+  b += txt(10, 32, "every window attends to every other window", 'class="mut"');
+  ws.forEach((w, i) => { b += rect(i * cw, base, cw - .7, 26, "s" + w.s, `opacity="${i === top ? 1 : .55}"`); });
+  others.forEach(([, i]) => {
+    const x1 = top * cw + 1.2, x2 = i * cw + 1.2, mid = (x1 + x2) / 2, h = Math.min(40, 10 + Math.abs(x2 - x1) * .25);
+    b += `<path d="M${x1},${base} Q${mid},${base - h} ${x2},${base}" fill="none" style="stroke:var(--new)" stroke-width="1.2" opacity=".85"/>`;
+  });
+  b += txt(0, base + 40, `strongest ${f} window looks at matching windows in other planes`, 'class="mut"');
+  b += rect(0, base + 50, 310, 30, "", 'fill="none" style="stroke:var(--line)" rx="6"');
+  b += txt(10, base + 69, "x ← x + g · context(x)    g starts at 0 (= Exp 1c)");
+  return svg(312, base + 84, b, "cross-window transformer");
+}
+function topk(ws, f) {
+  const e = evidence(ws, f, 11), k = Math.ceil(ws.length * 0.1);
+  const order = e.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, k).map(x => x[1]);
+  const cw = 6; let b = "";
+  e.forEach((v, i) => {
+    const h = 6 + v * 50, sel = order.includes(i);
+    b += rect(i * cw, 60 - h, cw - 1, h, sel ? "newf" : "off");
+  });
+  ws.forEach((w, i) => { b += rect(i * cw, 63, cw - 1, 4, "s" + w.s); });
+  const mean = order.reduce((a, i) => a + e[i], 0) / k;
+  b += txt(0, 84, `${f}: mean of top ${k} window logits (10% of 48)`, 'font-weight="600"');
+  b += txt(0, 98, "the other 43 windows are ignored for this finding", 'class="mut"');
+  return { svg: svg(300, 102, b, "top-k pooling"), score: mean };
+}
+function attention(ws, f) {
+  const e = evidence(ws, f, 5), temp = 0.12;
+  const ex = e.map(v => Math.exp(v / temp)), Z = ex.reduce((a, b) => a + b, 0), a = ex.map(v => v / Z);
+  const mx = Math.max(...a), cw = 3.2; let b = "";
+  a.forEach((v, i) => { const h = 2 + 52 * v / mx; b += rect(i * cw, 56 - h, cw - .7, h, "chgf", `opacity="${.35 + .65 * v / mx}"`); });
+  ws.forEach((w, i) => { b += rect(i * cw, 59, cw - .7, 4, "s" + w.s); });
+  const share = [0, 1, 2, 3, 4].map(s => a.reduce((acc, v, i) => acc + (ws[i].s === s ? v : 0), 0));
+  b += txt(0, 80, `${f}: softmax weights over 94 windows (sum = 1)`, 'font-weight="600"');
+  b += txt(0, 94, "weight by slot: " + share.map((v, s) => `${SLOTNAME[s].replace(" fluid", " F").replace(" non-fluid", " nF")} ${Math.round(v * 100)}%`).join(" · "), 'class="mut" font-size="8.5"');
+  b += txt(0, 110, "feature = Σ weight × token → per-finding linear → logit", 'class="mut"');
+  return { svg: svg(310, 114, b, "attention pooling"), score: e.reduce((acc, v, i) => acc + v * a[i], 0) };
+}
+function outputs(scores) {
+  let b = ""; const bw = 300 / 12;
+  scores.forEach((v, i) => {
+    const p = 1 / (1 + Math.exp(-(v - .55) * 8)), h = 4 + p * 46;
+    b += rect(i * bw, 50 - h, bw - 4, h, "chgf", `opacity="${.3 + .7 * p}"`);
+    b += txt(i * bw, 62, T[i].split(" ").map(w => w[0]).join("").replace("'", ""), 'font-size="8" class="mut"');
+  });
+  b += txt(0, 78, "sigmoid → 12 probabilities", 'class="mut"');
+  return svg(300, 82, b, "output probabilities");
+}
+
+// ---------- page assembly
+const STAGES = [
+  ["Series & slices", "Which slices of the study are read at all.", "volume"],
+  ["Pixel size", "Field of view and how fine the pixels are, with a 5 mm patch zoomed to the real pixel grid.", "pixels"],
+  ["One window", "What one backbone input looks like.", "window"],
+  ["Windows per study", "Every window goes through the backbone separately.", "tiles"],
+  ["Backbone", "ResNet-50 feature maps at evaluation size, to scale.", "resnet"],
+  ["After the backbone", "What each window hands to the head.", "perwin"],
+  ["Between windows", "Can a window use what other windows show?", "context"],
+  ["Pooling over windows", "How a study-level score for the traced finding is made.", "pool"],
+  ["Output", "Study probabilities (illustrative).", "out"],
+];
+let finding = "Lateral OA";
+
+function render() {
+  const g = document.getElementById("grid");
+  let h = `<div class="cell head"></div>
+    <div class="cell head"><h2>r50 v3.1-D2 224</h2><small>original recipe · fold 0 0.8963 · LB 0.925</small></div>
+    <div class="cell head"><h2>Exp 1c · r50 d96</h2><small>fold 0 0.9074 · LB 0.933 · same backbone + labels</small></div>
+    <div class="cell head"><h2>Exp 2a · proposed</h2><small>Exp 1c + slot/position + cross-window transformer</small></div>`;
+  const pk = topk(W925, finding), at = attention(W96, finding);
+  for (const [name, desc, key] of STAGES) {
+    h += `<div class="cell stage"><h3>${name}</h3><p>${desc}</p></div>`;
+    if (key === "volume") {
+      h += `<div class="cell">${volume(R925, 48)}<div class="note">4 series, 12 slices each, from the <b>central 20–80%</b>. The medial and lateral edges of the sagittal stack are never read.</div></div>`;
+      h += `<div class="cell chg">${volume(D96, 96)}<div class="note">5 fixed slots, 96 slices from <b>2–98%</b>. Both compartment edges are in.</div></div>`;
+      h += `<div class="cell"><div class="same">same as Exp 1c</div></div>`;
+    } else if (key === "pixels") {
+      h += `<div class="cell">${pixels(140 / 224, "0.63 mm/px", 0)}<div class="note">224 px across 140 mm.</div></div>`;
+      h += `<div class="cell chg">${pixels(140 / 384, "0.36 mm/px", 117)}<div class="note">384 px across 140 mm (≈ scanner detail). Evaluation reads the centre 320 px.</div></div>`;
+      h += `<div class="cell"><div class="same">same as Exp 1c</div></div>`;
+    } else if (key === "window") {
+      h += `<div class="cell">${windowStack([{cls:"s0",label:"slice s−1"},{cls:"s0",label:"slice s"},{cls:"s0",label:"slice s+1"},{cls:"off",label:"mask s−1",op:.8},{cls:"off",label:"mask s",op:.8},{cls:"off",label:"mask s+1",op:.8}], 224)}<div class="note">3 neighbouring slices of one series + 3 masks marking real vs padded pixels. conv1 widened to 6 inputs.</div></div>`;
+      h += `<div class="cell chg">${windowStack([{cls:"s0",label:"slice c−1"},{cls:"s0",label:"slice c"},{cls:"s0",label:"slice c+1"}], 320)}<div class="note">3 neighbouring slices as RGB, the standard ImageNet input. No masks.</div></div>`;
+      h += `<div class="cell"><div class="same">same as Exp 1c</div></div>`;
+    } else if (key === "tiles") {
+      h += `<div class="cell">${tiles(W925, 24)}<div class="note">Training samples 24 of these.</div></div>`;
+      h += `<div class="cell chg">${tiles(W96, 24)}<div class="note">Training samples 16, one per 1/16 of the volume.</div></div>`;
+      h += `<div class="cell"><div class="same">same as Exp 1c</div></div>`;
+    } else if (key === "resnet") {
+      h += `<div class="cell">${resnet(224)}<div class="note">Last map 7×7: each cell covers 20 mm of knee.</div></div>`;
+      h += `<div class="cell chg">${resnet(320)}<div class="note">Same network, bigger input. Last map 10×10: each cell covers ~11.7 mm.</div></div>`;
+      h += `<div class="cell"><div class="same">same backbone as Exp 1c</div></div>`;
+    } else if (key === "perwin") {
+      h += `<div class="cell">${logitGrid(W925, finding)}<div class="note">Each window is <b>classified immediately</b>: 12 scores per window, before any pooling.</div></div>`;
+      h += `<div class="cell chg">${tokens(W96, false)}<div class="note">Each window becomes a <b>2048-d feature</b> (LayerNorm). Classification happens after pooling.</div></div>`;
+      h += `<div class="cell new">${tokens(W96, true)}<div class="note">Same features, plus a learned <b>slot embedding</b> and an <b>anatomical position</b> (sagittal medial→lateral, coronal front→back, axial top→bottom).</div></div>`;
+    } else if (key === "context") {
+      h += `<div class="cell"><div class="same">none: every window scored in isolation</div></div>`;
+      h += `<div class="cell"><div class="same">none: every window encoded in isolation</div></div>`;
+      h += `<div class="cell new">${contextDiagram(W96, finding)}<div class="note">A coronal window showing the lateral compartment can now be matched with the lateral sagittal windows before pooling.</div></div>`;
+    } else if (key === "pool") {
+      h += `<div class="cell">${pk.svg}<div class="note">Fixed rule per finding: average the 5 highest window scores.</div></div>`;
+      h += `<div class="cell chg">${at.svg}<div class="note">Learned rule per finding: a softmax over windows chooses where to look, then one classifier per finding.</div></div>`;
+      h += `<div class="cell"><div class="same">same attention pooling, over context-aware tokens</div></div>`;
+    } else if (key === "out") {
+      const s925 = T.map(t => topk(W925, t).score), s96 = T.map(t => attention(W96, t).score);
+      h += `<div class="cell">${outputs(s925)}</div><div class="cell">${outputs(s96)}</div><div class="cell"><div class="same">12 probabilities, same head</div></div>`;
+    }
+  }
+  g.innerHTML = h;
+  if (typeof markZoomable === "function") markZoomable();
+}
+function buttons() {
+  const box = document.getElementById("findings");
+  box.innerHTML = T.map(t => `<button type="button" id="f-${T.indexOf(t)}" aria-pressed="${t === finding}">${t}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    finding = T[+b.id.slice(2)];
+    box.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    render();
+  }));
+}
+const MODELS = ["r50 v3.1-D2 224 (0.925)", "Exp 1c · r50 d96", "Exp 2a · proposed"];
+const zoom = document.getElementById("zoom");
+document.getElementById("zoomClose").addEventListener("click", () => zoom.close());
+zoom.addEventListener("click", e => { if (e.target === zoom) zoom.close(); });
+document.getElementById("grid").addEventListener("click", e => {
+  const cell = e.target.closest(".cell.zoomable"); if (!cell) return;
+  const cells = [...cell.parentElement.children], i = cells.indexOf(cell);
+  const stage = cells[i - (i % 4)].querySelector("h3").textContent;
+  document.getElementById("zoomTitle").textContent = `${stage} — ${MODELS[(i % 4) - 1]}`;
+  document.getElementById("zoomBody").innerHTML = cell.innerHTML;
+  zoom.showModal();
+});
+function markZoomable() { document.querySelectorAll("#grid .cell").forEach(c => { if (c.querySelector("svg")) { c.classList.add("zoomable"); c.title = "Click to enlarge"; } }); }
+buttons(); render();
+</script>
+</body>
+</html>

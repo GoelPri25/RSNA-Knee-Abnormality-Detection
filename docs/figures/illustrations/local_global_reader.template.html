@@ -1,0 +1,126 @@
+<div id="knee-local-global-reader">
+  <style>
+    #knee-local-global-reader {color:var(--foreground);}
+    #knee-local-global-reader .controls {display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin-bottom:16px;}
+    #knee-local-global-reader .controls label {display:grid;gap:5px;flex:1;min-width:150px;}
+    #knee-local-global-reader .slices {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+    #knee-local-global-reader figure {margin:0;text-align:center;}
+    #knee-local-global-reader figure img {width:100%;max-width:224px;aspect-ratio:1;object-fit:contain;}
+    #knee-local-global-reader figcaption {margin-bottom:5px;min-height:2.5em;}
+    #knee-local-global-reader .meta {text-align:center;margin:8px 0 12px;}
+    #knee-local-global-reader .arrow {text-align:center;color:var(--foreground);margin:4px 0;}
+    #knee-local-global-reader .branches {display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+    #knee-local-global-reader .branches h3 {text-align:center;margin:8px 0;}
+    #knee-local-global-reader .node {display:block;width:100%;height:110px;overflow:visible;}
+    #knee-local-global-reader .node text {fill:var(--foreground);font-weight:400;}
+    #knee-local-global-reader .targets {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;text-align:center;margin:12px 0;}
+    #knee-local-global-reader details {margin:14px 0;}
+    #knee-local-global-reader summary {color:var(--foreground);}
+    #knee-local-global-reader .foot {margin-top:12px;}
+    @media(max-width:580px){#knee-local-global-reader .branches {grid-template-columns:1fr;}#knee-local-global-reader .targets {grid-template-columns:1fr 1fr;}}
+  </style>
+  <h2>Local + global MRI reader</h2>
+  <div class="controls">
+    <label class="form-label">Real training series
+      <select class="form-select" id="klg-series">
+        <option value="0">Slot 0 — sagittal</option><option value="1">Slot 1 — coronal</option>
+        <option value="2">Slot 2 — axial</option><option value="3">Slot 3 — sagittal</option>
+      </select>
+    </label>
+    <label class="form-label">Input channels
+      <select class="form-select" id="klg-input"><option value="images">3 intensity channels</option><option value="support">3 acquired-support channels</option></select>
+    </label>
+    <label class="form-label">Mode
+      <select class="form-select" id="klg-mode"><option value="train">Training — 24 windows</option><option value="eval">Evaluation — up to 48 windows</option></select>
+    </label>
+  </div>
+  <div class="slices">
+    <figure><figcaption id="klg-prev-caption">Previous acquired slice</figcaption><img id="klg-prev" alt="Real previous acquired MRI slice"></figure>
+    <figure><figcaption id="klg-centre-caption">Centre slice</figcaption><img id="klg-centre" alt="Real centre acquired MRI slice"></figure>
+    <figure><figcaption id="klg-next-caption">Next acquired slice</figcaption><img id="klg-next" alt="Real next acquired MRI slice"></figure>
+  </div>
+  <div class="meta text-small" id="klg-meta" aria-live="polite"></div>
+  <div class="arrow">↓ 3 intensities + 3 support masks · 224 × 224 per window</div>
+  <svg class="node" id="klg-encoder" role="img" aria-label="Shared ResNet50 encoder"></svg>
+  <div class="arrow" id="klg-token-count">↓ 24 window vectors × 2,048 features · shared by both paths</div>
+  <div class="branches">
+    <div>
+      <h3>Local evidence</h3>
+      <svg class="node" id="klg-local-head" role="img" aria-label="Window classification head"></svg>
+      <div class="arrow">↓</div>
+      <svg class="node" id="klg-local-pool" role="img" aria-label="Target-specific top-k pooling"></svg>
+    </div>
+    <div>
+      <h3>Study-wide context</h3>
+      <svg class="node" id="klg-project" role="img" aria-label="Feature projection and metadata"></svg>
+      <div class="arrow">↓</div>
+      <svg class="node" id="klg-transformer" role="img" aria-label="Small Transformer encoder"></svg>
+      <div class="arrow">↓</div>
+      <svg class="node" id="klg-query" role="img" aria-label="Finding query cross-attention and correction"></svg>
+    </div>
+  </div>
+  <div class="arrow">↓ Local logits + 0.1 × contextual correction ↓</div>
+  <svg class="node" id="klg-output" role="img" aria-label="Combined study predictions"></svg>
+  <div class="targets text-small">
+    <span>ACL</span><span>MCL</span><span>Medial meniscus</span><span>Lateral meniscus</span>
+    <span>Medial OA</span><span>Lateral OA</span><span>PF OA</span><span>Effusion</span>
+    <span>Synovitis</span><span>Baker’s cyst</span><span>Contusion</span><span>Fracture</span>
+  </div>
+  <svg class="node" id="klg-loss" role="img" aria-label="Training loss and gradient update"></svg>
+  <details>
+    <summary>Inside the Transformer</summary>
+    <div class="arrow">256-D window tokens → LayerNorm</div>
+    <svg class="node" id="klg-self-attn" role="img" aria-label="Four-head self-attention"></svg>
+    <div class="arrow">↓ Residual addition → LayerNorm</div>
+    <svg class="node" id="klg-feed-forward" role="img" aria-label="Transformer feed-forward layer"></svg>
+    <div class="arrow">↓ Residual addition → contextual window vectors</div>
+    <svg class="node" id="klg-cross-attn" role="img" aria-label="Finding-query cross-attention"></svg>
+  </details>
+  <div class="foot text-small" id="klg-counts"></div>
+  <div class="text-small">Real cached acquired slices from one report-training knee. Arrows are architecture connections, not measured attention weights.</div>
+  <script type="application/json" id="klg-data">__SAMPLE_JSON__</script>
+  <script>
+    (()=>{
+      const root=document.getElementById('knee-local-global-reader');
+      const data=JSON.parse(root.querySelector('#klg-data').textContent);
+      const series=root.querySelector('#klg-series'),input=root.querySelector('#klg-input'),mode=root.querySelector('#klg-mode');
+      const NS='http://www.w3.org/2000/svg';
+      const specs=new Map();
+      function node(id,title,lines,colour){specs.set(id,{title,lines,colour});draw(id);}
+      function draw(id){
+        const svg=root.querySelector('#'+id),s=specs.get(id),w=svg.clientWidth||300;
+        svg.replaceChildren();svg.setAttribute('viewBox',`0 0 ${w} 110`);
+        const rect=document.createElementNS(NS,'rect');rect.setAttribute('x','1');rect.setAttribute('y','2');rect.setAttribute('width',w-2);rect.setAttribute('height','105');rect.setAttribute('rx','8');
+        rect.style.fill=`color-mix(in srgb, var(${s.colour}) 12%, var(--background))`;rect.style.stroke='var(--border)';svg.append(rect);
+        [s.title,...s.lines].forEach((str,i)=>{const t=document.createElementNS(NS,'text');t.setAttribute('x',w/2);t.setAttribute('y',28+i*23);t.setAttribute('text-anchor','middle');t.style.fontSize=i?'12px':'14px';t.style.fontWeight=i?'400':'500';t.textContent=str;svg.append(t);});
+      }
+      function update(){
+        const s=data.samples[Number(series.value)],n=mode.value==='train'?24:48;
+        ['prev','centre','next'].forEach((k,i)=>{
+          const img=root.querySelector('#klg-'+k);img.src=s[input.value][i];
+          img.alt=`Real ${s.plane} acquired ${input.value==='support'?'support mask':'MRI slice'} ${s.indices[i]}`;
+          root.querySelector('#klg-'+k+'-caption').textContent=`${['Previous','Centre','Next'][i]} · slice ${s.indices[i]}`;
+        });
+        root.querySelector('#klg-meta').textContent=`${s.plane} · fluid-sensitive: ${s.fluid==='1'?'yes':'no'} · fat suppression: ${s.fat==='1'?'yes':s.fat==='0'?'no':'unknown'} · gaps ${s.gaps.join(' / ')} mm · position ${s.position}`;
+        root.querySelector('#klg-token-count').textContent=`↓ ${n} window vectors × 2,048 features · shared by both paths`;
+        node('klg-encoder','Shared ResNet50',['ImageNet start; all layers trainable','6-channel window → one 2,048-D vector'],'--viz-series-1');
+        node('klg-local-head','Window classifier',['Dropout 0.4 → Linear(2,048, 12)','12 logits for every window'],'--viz-series-2');
+        node('klg-local-pool','Top 10% mean, per finding',[`Mean of the strongest ${Math.ceil(.1*n)} of ${n} windows`,'12 local study logits'],'--viz-series-2');
+        node('klg-project','Project + acquisition metadata',['2,048 → 256; add metadata embeddings','Plane · fluid · fat · slot · position · gaps'],'--viz-series-3');
+        node('klg-transformer','1 small Transformer layer',[`${n} tokens × 256 features; 4 attention heads`,'Windows interact only within their knee'],'--viz-series-3');
+        node('klg-query','12 learned finding queries',['4-head cross-attention → 12 × 256','LayerNorm → Linear(256, 1) → correction'],'--viz-series-3');
+        node('klg-output','Add logits, then sigmoid',['12 probabilities for one knee','Single model; both paths trained together'],'--viz-series-4');
+        node('klg-loss',mode.value==='train'?'Weighted soft-label BCE':'Validation / inference',[mode.value==='train'?'HPO v3.1-D2 → AdamW gradients through both paths':'Steven-v4 fold 0 scores checkpoints and controls',mode.value==='train'?'AUC is measured after the epoch':'No gradients or optimizer updates'],'--viz-series-4');
+        node('klg-self-attn','Window-to-window attention',['Q, K, V come from the window tokens','4 heads × 64 features; dropout 0.1'],'--viz-series-3');
+        node('klg-feed-forward','Token feed-forward network',['Linear 256 → 512 → 256; ReLU','One encoder layer, with residual connections'],'--viz-series-3');
+        node('klg-cross-attn','Finding-to-window attention',['12 learned queries supply Q','Context tokens supply K and V'],'--viz-series-3');
+        root.querySelector('#klg-counts').textContent=`${(data.counts.total/1e6).toFixed(2)}M parameters total · ${(data.counts.backbone/1e6).toFixed(2)}M in ResNet · ${((data.counts.total-data.counts.backbone-data.counts.head)/1e6).toFixed(2)}M in the context path`;
+      }
+      [series,input,mode].forEach(el=>el.addEventListener('change',()=>{
+        update();
+      }));
+      function restore(s){if(s&&typeof s==='object'){if(s.series>=0&&s.series<4)series.value=String(s.series);if(['images','support'].includes(s.input))input.value=s.input;if(['train','eval'].includes(s.mode))mode.value=s.mode;}update();}
+      new ResizeObserver(()=>specs.forEach((_,id)=>draw(id))).observe(root);
+    })();
+  </script>
+</div>
