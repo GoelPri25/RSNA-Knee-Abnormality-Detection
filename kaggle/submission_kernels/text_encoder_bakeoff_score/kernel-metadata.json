@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-text-encoder-bakeoff-score",
+  "title": "RSNA Text Encoder Bakeoff Score",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "tumis001/rsna-text-bakeoff-inputs"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

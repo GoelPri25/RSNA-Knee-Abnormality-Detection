@@ -1,0 +1,705 @@
+"""Fast global-only submission (efficiency track): r50-GL v4 l4copy global head (F1 / E4-ALL weights), nothing else.
+Same model output as the global head of the E4 / F1 kernels; the speed comes from the code path:
+  io      one process; file reads in threads, started before torch is imported; DICOM headers parsed from the raw
+          bytes (explicit VR little endian; anything else falls back to pydicom); pixels = np.frombuffer at the
+          PixelData offset
+  volume  the E3 d96 builder logic on the GPU: exact 2/98 percentiles (integer histogram), crop, cv2 INTER_AREA as
+          a matrix product (weights taken from cv2 itself), uint8 truncation
+  model   plain-torch ResNet-50, BatchNorm folded into fp16 convs (slim weights), no timm
+MODE = "eval": the competition test set. MODE = "eval": EVAL_N fold-0 training studies (timing + fidelity vs REF).
+"""
+import os
+import time
+
+T0 = time.perf_counter()
+import csv  # noqa: E402
+import struct  # noqa: E402
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+
+import numpy as np  # noqa: E402
+
+MODE = "eval"
+EVAL_N = 883
+EVAL_IDS = "tumis001/rsna-fast-eval/eval_ids.txt"   # eval mode: gold-58 first, then the 825 fold-0 studies (IDs only)
+IO_THREADS = 128
+PREFETCH = "none"                  # torch libraries read ahead at start: none / torch (torch/lib) / all (+ nvidia libs)
+WARM_NBCONVERT = True              # a nice-19 child imports nbconvert + renders an empty notebook (page cache for the HTML step)
+NBWARM_EARLY = False               # start that child at t=0 (else after torch), so it is done before the HTML step starts
+WARM_TRACE = True                  # at start: read the recorded page trace (torch / CUDA / cv2 pages) with WARM_THREADS threads
+WARM_THREADS = 32
+GAPMON = False                     # at exit: a detached monitor logs processes every 0.25 s to gapmon.log (what runs after the script)
+RECORD = False                     # at the end: write the resident file pages of everything loaded (page trace for a later readahead)
+HEAD_BYTES = 8192
+LOOKAHEAD = 16
+SLIM = "tumis001/rsna-fast-e4all-weights/e4all_global_fp16.pt"
+REF = None
+
+TARGETS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA",
+           "PF OA", "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"]
+IMG, CROP_MM, EVAL_RES, EVAL_WINDOWS = 384, 140.0, 320, 94
+SLOTS = [("Sagittal", 1, 26), ("Sagittal", 0, 22), ("Coronal", 1, 18), ("Coronal", 0, 12), ("Axial", -1, 18)]
+MAXS = sum(k for _, _, k in SLOTS)
+LAYERS = (3, 4, 6, 3)
+
+
+def find(rel):
+    owner, slug, *rest = rel.split("/")
+    for base in (f"/kaggle/input/datasets/{owner}/{slug}", f"/kaggle/input/{slug}"):
+        p = os.path.join(base, *rest)
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError(rel)
+
+
+def competition_dir():
+    for p in ("/kaggle/input/competitions/rsna-knee-abnormality-detection", "/kaggle/input/rsna-knee-abnormality-detection"):
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError("competition data")
+
+
+def read_csv(path):
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+# ---------------------------------------------------------------- DICOM from raw bytes (explicit VR little endian)
+LONG = {b"OB", b"OD", b"OF", b"OL", b"OV", b"OW", b"SQ", b"UC", b"UN", b"UR", b"UT"}
+NEED = {0x00020010: "ts", 0x00200032: "ipp", 0x00200037: "iop", 0x00200013: "inst", 0x00280002: "spp",
+        0x00280004: "photo", 0x00280010: "rows", 0x00280011: "cols", 0x00280030: "ps", 0x00280100: "bits",
+        0x00280103: "signed", 0x00281053: "slope"}
+EVRLE = b"1.2.840.10008.1.2.1"
+
+
+class Short(Exception):
+    pass
+
+
+class Unsupported(Exception):
+    pass
+
+
+def _skip_sq(b, p):
+    """p = first byte inside an undefined-length sequence -> first byte after its delimiter."""
+    while True:
+        g, e, L = struct.unpack_from("<HHI", b, p)
+        p += 8
+        if g != 0xFFFE:
+            raise Unsupported("item")
+        if e == 0xE0DD:
+            return p
+        p = _elements(b, p, None, item=True) if L == 0xFFFFFFFF else p + L
+
+
+def _elements(b, p, out, item=False, header_only=False):
+    n = len(b)
+    while True:
+        if p + 8 > n:
+            raise Short
+        g, e = struct.unpack_from("<HH", b, p)
+        if item and g == 0xFFFE and e == 0xE00D:
+            return p + 8
+        tag = (g << 16) | e
+        if not item:
+            if g != 2 and _str(out.get("ts", b"")) != EVRLE:
+                raise Unsupported(out.get("ts"))
+            if header_only and tag > 0x00281053:
+                return p
+        vr = b[p + 4:p + 6]
+        if vr in LONG:
+            if p + 12 > n:
+                raise Short
+            L = struct.unpack_from("<I", b, p + 8)[0]
+            p += 12
+        else:
+            L = struct.unpack_from("<H", b, p + 6)[0]
+            p += 8
+        if tag == 0x7FE00010 and not item:
+            out["pix"] = p
+            return p
+        if L == 0xFFFFFFFF:
+            p = _skip_sq(b, p)
+            continue
+        if out is not None and not item and tag in NEED:
+            if p + L > n:
+                raise Short
+            out[NEED[tag]] = bytes(b[p:p + L])
+        p += L
+
+
+def parse(b, header_only):
+    if len(b) < 132 or b[128:132] != b"DICM":
+        raise Unsupported("no preamble")
+    out = {}
+    try:
+        _elements(b, 132, out, header_only=header_only)
+    except struct.error:
+        raise Short
+    return out
+
+
+def _str(v):
+    return v.rstrip(b"\x00 ")
+
+
+def _us(v):
+    return struct.unpack_from("<H", v)[0]
+
+
+def _ds(v):
+    return [float(x) for x in _str(v).decode().split("\\")]
+
+
+def header(path):
+    """-> (slice position, path, row spacing, ok) = the E3 builder's header()."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_RANDOM)      # NFS: no readahead of the pixel data
+            b = os.pread(fd, HEAD_BYTES, 0)
+            while True:
+                try:
+                    h = parse(b, header_only=True)
+                    break
+                except Short:
+                    more = os.pread(fd, len(b), len(b))
+                    if not more:
+                        raise
+                    b += more
+        finally:
+            os.close(fd)
+        iop, ipp = h.get("iop"), h.get("ipp")
+        iop = _ds(iop) if iop else None
+        if iop is not None and ipp is not None and len(iop) == 6:
+            r, c = np.array(iop[:3]), np.array(iop[3:])
+            pos = float(np.dot(np.array(_ds(ipp)), np.cross(r, c)))
+        else:
+            pos = float(int(_str(h["inst"]).decode())) if _str(h.get("inst", b"")) else 0.0
+        ps = h.get("ps")
+        return pos, path, (_ds(ps)[0] if ps and _str(ps) else 0.5), True
+    except Unsupported:
+        return header_pydicom(path)
+    except Exception:
+        return 0.0, path, 0.5, False
+
+
+def header_pydicom(path):
+    import pydicom
+    try:
+        h = pydicom.dcmread(path, stop_before_pixels=True)
+        iop, ipp = getattr(h, "ImageOrientationPatient", None), getattr(h, "ImagePositionPatient", None)
+        if iop is not None and ipp is not None and len(iop) == 6:
+            r, c = np.array(iop[:3], float), np.array(iop[3:], float)
+            pos = float(np.dot(np.array(ipp, float), np.cross(r, c)))
+        else:
+            pos = float(getattr(h, "InstanceNumber", 0) or 0)
+        ps = getattr(h, "PixelSpacing", None)
+        return pos, path, (float(ps[0]) if ps is not None else 0.5), True
+    except Exception:
+        return 0.0, path, 0.5, False
+
+
+def pixels(path):
+    """-> (stored values, unsigned 16-bit read as int16?, inversions). Inversions = MONOCHROME1 + negative rescale
+    slope; the 2/98 window removes any positive slope and intercept, so the modality LUT is not applied."""
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_RANDOM)
+        b = os.pread(fd, os.fstat(fd).st_size, 0)
+    finally:
+        os.close(fd)
+    try:
+        h = parse(b, header_only=False)
+        if "pix" not in h or _us(h["bits"]) != 16 or ("spp" in h and _us(h["spp"]) != 1):
+            raise Unsupported("pixel format")
+        rows, cols = _us(h["rows"]), _us(h["cols"])
+        signed = "signed" in h and _us(h["signed"]) == 1
+        a = np.frombuffer(b, "<i2", rows * cols, h["pix"]).reshape(rows, cols)
+        slope = _str(h.get("slope", b""))
+        inv = (_str(h.get("photo", b"")) == b"MONOCHROME1") + (bool(slope) and float(slope.decode()) < 0)
+        return a, not signed, int(inv)
+    except (Unsupported, Short, KeyError, ValueError, struct.error):
+        import pydicom
+        d = pydicom.dcmread(path)
+        a = d.pixel_array.astype(np.int32)
+        inv = (str(getattr(d, "PhotometricInterpretation", "")) == "MONOCHROME1") + (float(getattr(d, "RescaleSlope", 1) or 1) < 0)
+        return a, False, int(inv)
+
+
+# ---------------------------------------------------------------- study loading (threads)
+def assign(rows):
+    out, used, idx = [], set(), 0
+    for plane, fluid, k in SLOTS:
+        cands = [r for r in rows if r["Anatomical_Plane"] == plane and r["SeriesInstanceUID"] not in used]
+        pref = [r for r in cands if fluid in (0, 1) and int(r.get("Fluid_Sensitive", 0) or 0) == fluid]
+        row = (pref or cands or [None])[0]
+        if row is not None:
+            used.add(row["SeriesInstanceUID"])
+        out.append((idx, k, row and row["SeriesInstanceUID"]))
+        idx += k
+    return out
+
+
+def load_study(rows, series_dir, sid, files_pool):
+    """-> [(slot start, [(slot rows, stacked arrays, unsigned, inversions, crop px)] per shape group)]
+    Two network-disk rounds per study (all headers, then every distinct picked file once), not two per series."""
+    series = []
+    for start, k, uid in assign(rows):
+        if uid is None:
+            continue
+        d = os.path.join(series_dir, sid, uid)
+        files = sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith(".dcm")) if os.path.isdir(d) else []
+        if files:
+            series.append((start, k, files))
+    heads_all = list(files_pool.map(header, [f for _, _, fs in series for f in fs]))
+    plan, at = [], 0
+    for start, k, files in series:
+        heads = heads_all[at:at + len(files)]
+        at += len(files)
+        ok_ps = [h[2] for h in heads if h[3]]
+        med_ps = float(np.median(ok_ps)) if ok_ps else 0.5
+        heads.sort(key=lambda h: h[0])
+        n = len(heads)
+        lo, hi = int(n * 0.02), int(n * 0.98) - 1
+        hi = max(hi, lo)
+        picks = [int(min(p, n - 1)) for p in (np.linspace(lo, hi, k).round().astype(int) if n > 1 else [0] * k)]
+        plan.append((start, heads, med_ps, picks))
+
+    def load(path):
+        try:
+            return pixels(path)
+        except Exception:
+            return None
+    paths = list(dict.fromkeys(heads[p][1] for _, heads, _, picks in plan for p in picks))   # each file read once
+    got = dict(zip(paths, files_pool.map(load, paths)))
+    out = []
+    for start, heads, med_ps, picks in plan:
+        groups = {}
+        for j, p in enumerate(picks):
+            g = got[heads[p][1]]
+            if g is not None:
+                a, u, inv = g
+                ps = heads[p][2] if heads[p][2] > 0 else med_ps
+                cpx = min(int(round(CROP_MM / max(ps, 1e-3))), *a.shape)
+                groups.setdefault((a.shape, a.dtype.str, u, inv, cpx), []).append((j, a))
+        out.append((start, [(np.array([j for j, _ in v]), np.stack([a for _, a in v]), u, inv, cpx)
+                            for (_, _, u, inv, cpx), v in groups.items()]))
+    return out
+
+
+# ---------------------------------------------------------------- main
+_last = [T0, 0.0, 0, 0]
+
+
+def stage(name, out):
+    """Append 'name wall/cpu/diskMB/majflt' since the previous stage."""
+    import resource
+    r = resource.getrusage(resource.RUSAGE_SELF)
+    try:
+        rb = int([l for l in open("/proc/self/io") if l.startswith("read_bytes")][0].split()[1])
+    except Exception:
+        rb = 0
+    now, cpu = time.perf_counter(), r.ru_utime + r.ru_stime
+    out.append(f"{name} {now - _last[0]:.2f}s/cpu{cpu - _last[1]:.1f}/{(rb - _last[2]) / 1e6:.0f}MB/pf{r.ru_majflt - _last[3]}")
+    _last[:] = [now, cpu, rb, r.ru_majflt]
+
+
+def _readahead(paths):
+    for f in paths:
+        try:
+            fd = os.open(f, os.O_RDONLY)
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_WILLNEED)
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _libs(kind):
+    import glob
+    import importlib.util
+    out = []
+    t = importlib.util.find_spec("torch")
+    if t and t.submodule_search_locations:
+        out += sorted(glob.glob(os.path.join(t.submodule_search_locations[0], "lib", "*.so*")), key=os.path.getsize, reverse=True)
+    if kind == "all":
+        n = importlib.util.find_spec("nvidia")
+        for d in (n.submodule_search_locations if n and n.submodule_search_locations else []):
+            out += glob.glob(os.path.join(d, "*", "lib", "*.so*"))
+    return out
+
+
+def _warm_trace():
+    """Read the file ranges a previous run had in page cache after torch import + GPU init (PAGETRACE), in parallel:
+    the import then finds them cached instead of faulting them in one by one."""
+    import base64
+    import json
+    import zlib
+    tr = json.loads(zlib.decompress(base64.b64decode(PAGETRACE)))
+    jobs, step = [], 1 << 20
+
+    def first(f):                                             # torch's import path first, then the rest
+        b = os.path.basename(f)
+        return (0 if b.startswith(("libtorch", "libc10")) else 1 if "/nvidia/" in f or b.startswith("libcu") else
+                2 if "/torch/" in f else 3)
+    for f, rs in sorted(tr.items(), key=lambda kv: first(kv[0])):
+        for off, ln in rs:
+            for o in range(off, off + ln, step):
+                jobs.append((f, o, min(step, off + ln - o)))
+
+    def rd(j):
+        try:
+            fd = os.open(j[0], os.O_RDONLY)
+            try:
+                os.pread(fd, j[2], j[1])
+            finally:
+                os.close(fd)
+        except OSError:
+            pass
+    with ThreadPoolExecutor(WARM_THREADS) as ex:
+        list(ex.map(rd, jobs))
+
+
+def main():
+    import threading
+    if WARM_NBCONVERT and NBWARM_EARLY:
+        _nbwarm()
+    if WARM_TRACE:
+        threading.Thread(target=_warm_trace, daemon=True).start()
+    wbuf = {}
+
+    def fetch():                                             # weights live on gcsfuse: one sequential read while torch
+        with open(find(SLIM), "rb") as f:                     # imports (parallel range reads: 47.6 s, FAST-G v16)
+            wbuf["b"] = f.read()
+        wbuf["t"] = time.perf_counter() - T0
+    wt = threading.Thread(target=fetch, daemon=True)
+    wt.start()
+    if PREFETCH != "none":
+        threading.Thread(target=_readahead, args=(_libs(PREFETCH),), daemon=True).start()
+    data = competition_dir()
+    if MODE == "eval":
+        ids = [s for s in open(find(EVAL_IDS)).read().split() if s][:EVAL_N]
+        series_csv, series_dir = os.path.join(data, "train_series.csv"), os.path.join(data, "train_series")
+        fallback = {s: [0.5] * 12 for s in ids}
+    else:
+        sample = read_csv(os.path.join(data, "sample_submission.csv"))
+        assert list(sample[0]) == ["StudyInstanceUID", *TARGETS]
+        ids = [r["StudyInstanceUID"] for r in sample]
+        fallback = {r["StudyInstanceUID"]: [float(r[t]) for t in TARGETS] for r in sample}
+        series_csv, series_dir = os.path.join(data, "test_series.csv"), os.path.join(data, "test_series")
+    by, want = {}, set(ids)
+    for r in read_csv(series_csv):
+        if r["StudyInstanceUID"] in want:
+            by.setdefault(r["StudyInstanceUID"], []).append(r)
+    files_pool, study_pool = ThreadPoolExecutor(IO_THREADS), ThreadPoolExecutor(LOOKAHEAD)
+    timed, stages = {}, []
+
+    def job(s):
+        t = time.perf_counter()
+        r = load_study(by.get(s, []), series_dir, s, files_pool)
+        timed[s] = time.perf_counter() - t
+        return r
+    import queue as Q
+    work, slots_free = Q.Queue(), threading.Semaphore(LOOKAHEAD)
+
+    def feeder():
+        for s in ids:
+            slots_free.acquire()
+            work.put((s, study_pool.submit(job, s)))
+        work.put(None)                                       # end marker; each GPU worker passes it on
+    threading.Thread(target=feeder, daemon=True).start()     # file reads start before torch loads
+    stage("csv+io start", stages)
+
+    import torch
+    import torch.nn.functional as F
+    stage("torch", stages)
+    if WARM_NBCONVERT and not NBWARM_EARLY:
+        _nbwarm()
+    devs = [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
+    ctx = [threading.Thread(target=torch.zeros, args=(1,), kwargs={"device": d}, daemon=True) for d in devs]
+    for c in ctx:                                            # CUDA contexts come up while weights + cv2 load
+        c.start()
+    wt.join()
+    import io
+    W0 = torch.load(io.BytesIO(wbuf.pop("b")), map_location="cpu", weights_only=True)
+    stage("weights read", stages)
+    stages.append(f"(weights fetched at {wbuf['t']:.2f}s)")
+    import cv2
+    stage("cv2", stages)
+    o = (IMG - EVAL_RES) // 2
+    preds, t_load, t_gpu, t_vol, ready = {}, [0.0], [0.0], [0.0], {}
+
+    def gpu_worker(dev):
+        for c in ctx:
+            c.join()
+        W = {k: (v.to(dev).contiguous(memory_format=torch.channels_last) if v.dim() == 4 else v.to(dev)) for k, v in W0.items()}
+        t_w = time.perf_counter() - T0
+
+        def features(x):
+            x = F.max_pool2d(F.relu(F.conv2d(x, W["stem.w"], W["stem.b"], 2, 3)), 3, 2, 1)
+            for li, nb in enumerate(LAYERS, 1):
+                for bi in range(nb):
+                    p, s = f"layer{li}.{bi}", (2 if li > 1 and bi == 0 else 1)
+                    h = F.relu(F.conv2d(x, W[p + ".c1.w"], W[p + ".c1.b"]))
+                    h = F.relu(F.conv2d(h, W[p + ".c2.w"], W[p + ".c2.b"], s, 1))
+                    h = F.conv2d(h, W[p + ".c3.w"], W[p + ".c3.b"])
+                    x = F.relu(h + (F.conv2d(x, W[p + ".ds.w"], W[p + ".ds.b"], s) if bi == 0 else x))
+            return x
+
+        def head(fm):
+            h = F.layer_norm(fm.float().mean((2, 3)), (fm.shape[1],), W["norm.weight"], W["norm.bias"])
+            a = torch.softmax(F.linear(torch.tanh(F.linear(h, W["att.0.weight"], W["att.0.bias"])), W["att.3.weight"], W["att.3.bias"]), 0)
+            return torch.sigmoid(((a.T @ h) * W["clsW"]).sum(-1) + W["clsb"])
+        mean = torch.tensor([0.485, 0.456, 0.406], device=dev).view(1, 3, 1, 1) * 255
+        std = torch.tensor([0.229, 0.224, 0.225], device=dev).view(1, 3, 1, 1) * 255
+        rmat = {}
+
+        def R(c):
+            """cv2.resize(img, (IMG, IMG), INTER_AREA) for a c x c float image = R @ img @ R.T (separable, linear)."""
+            if c not in rmat:
+                rmat[c] = torch.from_numpy(cv2.resize(np.eye(c, dtype=np.float32), (c, IMG), interpolation=cv2.INTER_AREA)).to(dev)
+            return rmat[c]
+
+        def volume(slots):
+            vol = torch.zeros(MAXS, IMG, IMG, dtype=torch.uint8, device=dev)
+            for start, groups in slots:
+                if not groups:
+                    continue
+                ts = []
+                for js, arr, unsigned, inv, cpx in groups:
+                    t = torch.from_numpy(arr).to(dev, non_blocking=True).int()
+                    if unsigned:
+                        t = t & 0xFFFF
+                    for _ in range(inv):
+                        t = t.amax((1, 2), keepdim=True) - t
+                    ts.append((js, t, cpx))
+                ext = torch.stack([torch.stack([t.min(), t.max()]) for _, t, _ in ts])
+                lo, top = ext[:, 0].min(), ext[:, 1].max()
+                size = int(top - lo) + 1
+                hist = torch.zeros(size, dtype=torch.long, device=dev)
+                for _, t, _ in ts:
+                    hist += torch.bincount((t - lo).flatten(), minlength=size)
+                cum = torch.cumsum(hist, 0)
+                n = sum(t.numel() for _, t, _ in ts)
+                qv = []
+                for q in (2.0, 98.0):                                    # np.percentile, linear interpolation
+                    hq = (n - 1) * q / 100.0
+                    i = int(np.floor(hq))
+                    v = torch.searchsorted(cum, torch.tensor([i, min(i + 1, n - 1)], device=dev), right=True).double()
+                    qv.append((lo.double() + v[0] + (hq - i) * (v[1] - v[0])).float())
+                loq, hiq = qv
+                for js, t, cpx in ts:
+                    h, w = t.shape[1:]
+                    y0, x0 = (h - cpx) // 2, (w - cpx) // 2
+                    c = torch.clamp((t[:, y0:y0 + cpx, x0:x0 + cpx].float() - loq) / (hiq - loq + 1e-6), 0, 1)
+                    Rc = R(cpx)
+                    vol[torch.from_numpy(start + js).to(dev)] = (Rc @ c @ Rc.T * 255).to(torch.uint8)
+            return vol
+
+        with torch.inference_mode():
+            if MODE == "eval":                                # separate warm-up only for clean ms/study timing
+                head(features(torch.zeros(EVAL_WINDOWS, 3, EVAL_RES, EVAL_RES, device=dev, dtype=torch.half)
+                              .contiguous(memory_format=torch.channels_last)))
+                torch.cuda.synchronize(dev)
+            ready[str(dev)] = f"{t_w:.2f}/{time.perf_counter() - T0:.2f}"
+            fs, bs = torch.cuda.current_stream(dev), torch.cuda.Stream(dev)
+            bs.wait_stream(fs)
+            built = Q.Queue(maxsize=2)
+
+            def builder():                                    # next study's volume + windows on a side stream,
+                try:                                          # overlapping the current study's forward pass
+                    with torch.inference_mode(), torch.cuda.stream(bs):
+                        while True:
+                            item = work.get()
+                            if item is None:
+                                work.put(None)
+                                built.put(None)
+                                return
+                            sid, fut = item
+                            t = time.perf_counter()
+                            slots = fut.result()
+                            slots_free.release()
+                            t_load[0] += time.perf_counter() - t
+                            t = time.perf_counter()
+                            vol = volume(slots)
+                            mask = (vol.view(MAXS, -1).amax(1) > 0).cpu().numpy()
+                            x = None
+                            if mask.any():
+                                valid = np.where(mask)[0]
+                                if len(valid) < 3:
+                                    valid = np.arange(3)
+                                lo, hi = int(valid.min()), int(valid.max())
+                                cs = np.arange(lo + 1, hi) if hi - lo >= 2 else np.array([max(1, min((lo + hi) // 2, MAXS - 2))])
+                                cs = np.clip(cs[np.linspace(0, len(cs) - 1, EVAL_WINDOWS).round().astype(int)], 1, MAXS - 2)
+                                x = vol[torch.from_numpy(np.stack([cs - 1, cs, cs + 1], 1)).to(dev)][..., o:o + EVAL_RES, o:o + EVAL_RES]
+                                x = ((x.float() - mean) / std).half().contiguous(memory_format=torch.channels_last)
+                            ev = torch.cuda.Event()
+                            ev.record(bs)
+                            t_vol[0] += time.perf_counter() - t
+                            built.put((sid, x, ev))
+                except BaseException as e:
+                    built.put(e)
+                    raise
+            threading.Thread(target=builder, daemon=True).start()
+            while True:
+                item = built.get()
+                if item is None:
+                    return
+                if isinstance(item, BaseException):
+                    raise item
+                sid, x, ev = item
+                if x is None:
+                    continue
+                t = time.perf_counter()
+                fs.wait_event(ev)
+                x.record_stream(fs)                           # x was allocated on the builder stream
+                p = head(features(x))
+                if not torch.isfinite(p).all():
+                    raise ValueError(f"non-finite prediction {sid}")
+                preds[sid] = p.tolist()
+                t_gpu[0] += time.perf_counter() - t
+    t_ready = time.perf_counter()
+    errs = []
+
+    def run(dev):
+        try:
+            gpu_worker(dev)
+        except BaseException as e:                            # surface worker failures in the main thread
+            errs.append(e)
+            raise
+    workers = [threading.Thread(target=run, args=(d,)) for d in devs]
+    for w in workers:
+        w.start()
+    for w in workers:
+        w.join()
+    if errs:
+        raise errs[0]
+    stage("studies", stages)
+    t_end = time.perf_counter()
+    final = {s: preds.get(s, fallback[s]) for s in ids}
+    with open("/kaggle/working/submission.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["StudyInstanceUID", *TARGETS])
+        for s in ids:
+            w.writerow([s, *[f"{v:.6f}" for v in final[s]]])
+    msg = (f"{len(preds)}/{len(ids)} studies; total {time.perf_counter() - T0:.2f}s; gpus {len(devs)} weights/ready at "
+           + " ".join(ready.values()) + " | " + " ".join(stages))
+    if MODE == "eval":
+        import json
+        json.dump({"targets_in_order": TARGETS, "predictions": [{"study_id": s, "probabilities": final[s]} for s in ids]},
+                  open("/kaggle/working/eval_predictions.json", "w"))
+        k = len(ids)
+        msg += (f" | studies {t_end - t_ready:.2f}s = {(t_end - t_ready) / k * 1000:.0f} ms/study (summed over gpu workers: builder waiting for io "
+                f"{t_load[0] / k * 1000:.0f}, forward {t_gpu[0] / k * 1000:.0f}, volume build {t_vol[0] / k * 1000:.0f} on the side stream; "
+                f"io per study in its thread {np.mean(list(timed.values())) * 1000:.0f}) "
+                f"| cpus {os.cpu_count()}")
+        import pydicom
+        nh = npx = bad_h = bad_p = 0
+        for s in ids[:4]:
+            for _, _, uid in assign(by.get(s, [])):
+                if uid is None:
+                    continue
+                d = os.path.join(series_dir, s, uid)
+                for f in sorted(os.listdir(d))[:6]:
+                    f = os.path.join(d, f)
+                    nh += 1; bad_h += header(f)[0::2] != header_pydicom(f)[0::2]
+                    a, u, inv = pixels(f); ref_a = pydicom.dcmread(f).pixel_array
+                    npx += 1; bad_p += not np.array_equal(a.view(np.uint16) if u else a, ref_a)
+        maps = {}
+        for l in open("/proc/self/maps"):
+            f = l.split()[-1]
+            if ".so" in f and os.path.exists(f):
+                maps[f] = os.path.getsize(f)
+        top = sorted(maps.items(), key=lambda kv: -kv[1])[:25]
+        msg += " | mapped libs MB: " + ", ".join(f"{os.path.basename(f)} {v / 1e6:.0f}" for f, v in top) + f" (total {sum(maps.values()) / 1e6:.0f} MB in {len(maps)} files)"
+        msg += f" | raw reader vs pydicom: headers {nh - bad_h}/{nh} equal, pixels {npx - bad_p}/{npx} equal"
+        if REF:
+            ref = {r["study_id"]: r["probabilities"] for r in json.load(open(find(REF)))["predictions"]}
+            com = [s for s in ids if s in ref and s in preds]
+            dd = np.abs(np.array([preds[s] for s in com]) - np.array([ref[s] for s in com]))
+            msg += f" | vs training pipeline max|d| {dd.max():.4f} mean|d| {dd.mean():.5f} on {len(com)}"
+    print(msg, flush=True)
+    if GAPMON:
+        import subprocess
+        subprocess.Popen(["bash", "-c", "for i in $(seq 1 80); do echo \"== $(date +%s.%N) $(cat /proc/loadavg)\"; "
+                          "ps -eo pid,ppid,etimes,pcpu,stat,args --sort=-pcpu | head -10 | cut -c1-200; sleep 0.25; done "
+                          "> /kaggle/working/gapmon.log 2>&1"], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"gapmon start {time.time():.2f}", flush=True)
+    if RECORD:
+        record_trace("/kaggle/working/pagetrace.json")
+
+
+NBWARM = """
+try:
+    import nbformat, nbconvert.nbconvertapp
+    from nbconvert import HTMLExporter
+    HTMLExporter().from_notebook_node(nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell("x = 1")]))
+except Exception:
+    pass
+"""
+
+
+def _nbwarm():
+    import subprocess
+    import sys
+    subprocess.Popen([sys.executable, "-c", NBWARM], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     preexec_fn=lambda: os.nice(19))
+
+
+def record_trace(out_path):
+    """{file: [[offset, length], ...]} of page-cache-resident ranges (gaps < 128 KB merged) for every mapped file and
+    every imported module file (+ its .pyc)."""
+    import ctypes
+    import json
+    import mmap
+    import sys
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.mincore.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
+    pg, files = mmap.PAGESIZE, set()
+    for line in open("/proc/self/maps"):
+        f = line.split()[-1]
+        if f.startswith("/") and os.path.isfile(f) and not f.startswith("/kaggle"):
+            files.add(f)
+    for m in list(sys.modules.values()):
+        for f in (getattr(m, "__file__", None), getattr(m, "__cached__", None)):
+            if isinstance(f, str) and os.path.isfile(f) and not f.startswith("/kaggle"):
+                files.add(f)
+    trace, total = {}, 0
+    for f in sorted(files):
+        try:
+            size = os.path.getsize(f)
+            if size == 0:
+                continue
+            with open(f, "rb") as fh:
+                mm = mmap.mmap(fh.fileno(), size, access=mmap.ACCESS_COPY)
+            buf = ctypes.c_char.from_buffer(mm)
+            n = (size + pg - 1) // pg
+            vec = (ctypes.c_ubyte * n)()
+            ok = libc.mincore(ctypes.addressof(buf), size, vec) == 0
+            del buf
+            mm.close()
+            if not ok:
+                continue
+            res = np.frombuffer(vec, np.uint8) & 1
+            idx = np.flatnonzero(res)
+            if not len(idx):
+                continue
+            br = np.flatnonzero(np.diff(idx) > 32) + 1
+            rs = [[int(a[0]) * pg, int(a[-1] - a[0] + 1) * pg] for a in np.split(idx, br)]
+            trace[f] = rs
+            total += sum(l for _, l in rs)
+        except Exception:
+            continue
+    json.dump(trace, open(out_path, "w"))
+    print(f"page trace: {len(trace)} files, {total / 1e6:.0f} MB resident", flush=True)
+
+
+PAGETRACE = "eNrFfVuPq7q25n85ryc1l7lDvx61jtTaLy1tqbe0tIUIOAmrCLCA1GW2+r/3N2xCIAEnIYY6OnuuKheMD9vjbnv4//7HH6e6+mOb5n+U382hyK1fhvUf/+PPP9nGdUw7MP1//3sjn8nS7R9ZEUcZb//zFlXxIf3g8nHH9C3f/vfmT9NjluWyjWEZzDOpIfAN3/c3nueb9oDcBfKPMCy/4yg+8DDEz7tTc6rw469YPvJmGdYvPCChfCMwH6ITF1lRpb/5y2SOZdSEZRq/ZzpoVbyu0yJ/kVJRxkXCwyNvoiRqonFqhmn6/kPkyu+0mKBh2O6DRD559F7xXc2bFz8nqvZlVNUTo20w1w7ch+jUzasktlHNXXucium73kOztU1rHk98is0e/JDf5kRfXJK8ByjERd7wrwZPjBOyTM/1nyD0gSl6rU9xUX6/yCpEouL716Qprj8mZth2vId6QjIYZ1Fd86khCQzHfJASb9Ijf21kEx6nxyh7kUi6201yi2d5pv8YlVeHhOen48QEu8x4qCu7/Bg18eE1Ntmd8rgpimyqPw5zHvqYPW9Ifl5kuX1WbF/US/vfafmiLjhE9WGSRx6W4gOPyr8nOsNsnz1CI83rclLLGlZgug9pybSMkoRs9DihwDbZQ11659+fRZW8JoFZmnPx84vjK122cSKu41iPfczvY/SiCYIgb/mU1XiYivR9XhvZouRV1BTVi0x3zyt8gohCszxO6X1/atLs1U5lUbMrquOLaq4sqzRvXtQvf5/4ib/Yn79PBT7lRRGqojwpJobEcv3HlEvFy+p1bVnzDIqumJKjh9V/fZhmFjdwrceIpPt8ytF41LDWacPjU90Ux5fDtbqI36fij4c5t66zF3Vl3YD396/Oc1OdXg0b6tO2rIp40p497EE1UbVLp1RdG+0/QoYfy2k61Cv2GJmv5rOKyhc1Q3OoeJRMztTD000Oe9q8aNaa4p3nr822IDEpQw8rhqaKYr6N4vcXXf/mu+SvGnvQmJYkJ/Dsh6icTmnyoiX6jKocX1K/SkYmSWZQiervPE6Lq2RZmqfNVKpMxTZj1CjZEfIPnjdzvN9JijKfV2v8xntaTakAJqk2Uf1eP29+xujFRV430eQ4PtvpuKgK2Opc1yCq5lipg0eJfcW8bFL0WM/HkesZNeGBZ+VkrPDsfChZ8GluQTj1Psf5Gqe11zNsx/Qr1TUFEK6miCfjEaUHM0ZPePFzLMEYseqU59NB5LOfdnamlXpP6QiMUq0zMYYzHNFRck203/OKJ3qkAY4lj471jGBmlNodZfz0BJMe3kPhlbrmWKHYn54K6TJqkjPyG6HYtfUTQWpdFlWjbSYqiqf0MN0pT7+UQqZ0K6GMSE7JyjzhAN0hmcenqsIHaXKpegRbe7MSYfJeZjiUd8hKTp/BmrHw+5/ou9JojlHjeZJGM2KlEVoz82X8GKWZpukdocVzSnEmIaWQ52iHEZJiRZVy2zPWHcbIFVkaf09z3pOjJ9dZj7MWvm6pxQfq7JyA/JaWnIo5S50jtKqqmOPS3lLacZ6IGdUznQdwxiQplXTekkobmVnXMmBHeBXRfoInHMu0n5AA1XA9N/gyoTzNrE+KJqmgOaGJ4ExKSTyhh5QdHaUXZWlUz3Lex+mdml3oz+CNaWJhnc7YAHBomvKJgVPO6Q2tOEv51NqHa9j25JymR/LfqFHPnE7Qi7bx81MwTmuSlHLELrTOW5ie6LBS8O9RRlPZzNLn9yj3fFT9xO9tPniBNGnshUhTq36q07snHqMKT7c4VbE2//wu5bg4Hqe2/D0oJhOUBVuA4+bs9blHfJ5k/1UX+TN6VWVBbmglXDhjOki1fp0OUnUcUUrq+RnAr2/Jd54VUQLFJIPmPpW3L98NXfstS/PT19s+P/2qiwfWZwdkrzYOTpNUxooDkhMbAKdJK4dzSPpmzUhBVbmpZ0B2ZD+cYiAsx/ceG9yR7U+KOVNlEQdkicMeo6ncRDegeb19RwfN4ylr0jb5d7VKN01eGZoMyJdFnX7VhyM/6mazm20lis9VueADolfbBhQkzcB6cAiuFy41dP54HK6ba9AIZ/uhgwGK/R6s9IQFCXyLTXb8ikM1GXwVVSjHXHqBM5zXO4QV20ZVXKqiOn8dVUW14slJMQZKXlXTlYwW1oeomjTeKvfkIeq0AeKdV5oHpS6jz1zzJ89MX5ZRc3guyFSJwyg1ZYj53IeJ7asziFX8mSS0aryuKcVRzXfp1/NDdUOoOJZpNiv1dktKuedAlSW4JqVKlSlXzIY7+crv+9D1d40P36V7XesFJ7zY8FrXos4ouXgy7a1ccRqlRQZ0VhZ3lNoxSufo3HFak2t/hukGT34YdCvUmK5Pk3sAZgjyKDW5h7XWxBz1CUKgq6PT+l0lVKcq06fdR4iJdQwtlBTn/JSO0gipisOrnzzxZ/ieYujHqNUlFOqM7ci/U7HD9ZkciPI4YkePbKMugzZNdPpc0U2nrz38P/ZQ5R/y37djkZwyCuWJ7pTevqGQJe0v+MubayNm+GW2L1uecxWN3L6dbv9lGPSS+8v+xdoXXdOw6WyycLLYWO5klFB0koRYR+hmQEffS45xef3mAx3Hm+TdD7/99tT02IvbOqH32C/D/GVMHRkZffG3SS8aeNV+5r1YfGbLvDYTJ8Uxvo7lMoyv4wePfHVcfZdNQZSss3b0DMMVlHwrMJi9cUxGPLf502IGvA6x49eyxGTavoMYmtwR33Puj22S9VjpVg2PvcK/IBtyeILzsBqea5j3mXC3S+lFH6/aUzmVsff2cRzWArKF823rgenYUyxuYhIFE4DFO8bzbc8Xx/AN07N8x32Q9/dy78c4zcdGT6Sb8K4DZnZ68nO/N8cecwWObT0g9Mcz/5+/0fEs+/43lnHFzTe/fdfo2MP2bLi4mz8dx2MPj1nZ7pchYs8MVNX0J/yhVyjRdBEbjzH76gzH6EtNEv/nf54Vk2X1ADEp4JDANhzI3KVyg2NC/T/afeGoPNsRkd0SEmadB+12++HYi1/xVr5nDAb7PnP9buHGixtQnHltKZO0bt7KKH6P9jfLOqckCrdpLtalw4onaSX2kj7iGT0JRScnIwm4JE75nX8cJxxOyzDM+ZTlOY4QJo7n9fQSKWxAYD0HQr+KLRThAW3zl/TvQ8Uf5oXkeHD7KJGFv3EYXoYywkarpYdlrkE+eDVd02QOcfzvV7RNrauUOekpy2OQWah4wyXC5AnA27DMi+JyTJP86UuDyzxmer0nwGTkaVwaPNvyLav3iodAHibk0uDDEvh9FN/23cAwoX5txxAmlplMKMxWFZHRdYDT16n4wYMlds/ChBY87LP+1xqw1HBpejV0DB8a2BvQ8YPAgkfRawkwDl6/TyZzTMrV9FpM3zEcH3QCU36zZZoYTZvecqTrRUEXeVYb0/MdU7YERuAAywzgxYi3PNd2B8PlBKblWvQ9tmuacozhvDgDgwI/3GV+QJ13rEC2uPgiv/+M5RoBG8yVA2wM6MWPdwMncMRAm6bt9XP/jzFXu6HgSo7nsOmT+1bmQOyjMr392FlqoSU1M8v2GMa1unlldOkUEB3yLHmlZ7qGBJectWNax5q+WVJa4WMXVOcC4Uz1ldGQXoQeI9zRmrfP7jEQ4Zjo4YQzqSVZ4dU5StLsdlf8rtDm3YzS1zdjt+Sp5bGk3Rzq9SE91gt9esKb6XI4w+hsBnVapn9w89QM6sX2L8XZ8ZeZsizSvHnwbOkM8rWqwt/TVnWEfNNMH0R/eXBud3JMrv3NoE71HzTpAoTE5fcvymyIlNWuqOj82xuzGbMCbrwx+KPcc3YyC3XJxRoe833hDds+OdWO7wzW7J5F/vsUJfAsDm+BG3jWLgjeAsuOTTPhMrF0QYbX65jzgeo4Lb/DouT5Notq1w7fdjvXMRJv14VJgeHB5RYJU59Sp71wxXU9o++yB4Zl4yFVlGFiLF0KnEzGPEHWREhjwwvfWKblyIKfCDzgtPsb2yOf/OneXWnz1nXUpM/HELS6vCMAUVVF3yFcbWH5dPL6tWWiIjPbE51dpj7pUQcjQPyrTCuehFHTVHVohmyxuaGlpwfXYWfRx7O8Fmusj50DmgOSaDRct9Tv1VrQwFhanf+WfFw8tRVn5izcokRJEub8Myli1QY3phsrrEEmerDO3SuQtVA2C0+V4OiluyJARnZ/L8AUS8nQLZLwMiePZlytdLyAc4zowOvSvTlyvJEsPmiydJq6/Is23hZcpzzhqA3qREd1Wv/moQ0b87GEVlBUX7xa0ZsPxNO8Ph2pYw+V+J0PtKuKI/7GqzR+rMDrC1Dtiarw4bPt87H2vMnSY9rUet3RG5wjv970v4AOF9uUFQbpaj/XfCAlI1wVNHwZRWGRtLFBAZ+rSpOlLZ/QCMXjpbrmI1U8ni5ccbVlez5KfYigvR8ufjIf6ETh/QIjdpGY8AZCcdDHDxB8i/jcYI5YpGS2TayIsN8JzEHY7ziW5w0aAvzEegt+rufYVj/q9wzbsk1bKm8i6htQra4tN6NRQ2Ayz2e9pcbAs318wAYfw1yx1Y7ZjBZBZ4vj4sl5BY6ckSx954tDkd8W0jnUenEo6WGv0qt8qzkdMQpCYXwS1rTrN4/54njKmE4nDmk1rShLLxxNw9BGYF7pNzgjUOry//OikyfTFvM6MxIpTNeD0QRxz1WbB/PKkYPZGK35FPu/0mOZLQ9WRokCaabPPg5Vc/hr9/rFdKG1hZsUcDPl6AaO9s2o1pmuzj3NxhnEcqp+Ba7LdHTsgIeKfRUd15i0NE/4V9ggSHlXwc3MM93CFYoiMbpA8ig/T5qqT1fH7ObD0cVnCpyrgtezccoi+86LYxplCrCZAfINWE21LpqDSknNi1xvkboITMXuzy4aT4E1FCPf53ddnWs+iyQ93uudLsaX+e8Dj99VXdOkF0UukkIBBda8eOAW6o5l1mUvlctWevrSczWW9DJk/fNFuS3Nm6pQ+Mt6OqKqSK7Jk8inL67U04dWly4K0ddreoHyKNuv4JLfwsg2xdQzLTgqmNc6I/JxI914vKjPo4jHaPEZuoKgcHBCGcsd/q8C8K+mih67y+xxBMjH1xoR5jhSwnfyD7pSzR9pkkZ/xCfayiVvV0638jdxQq09iui4gdWeXXY82zPl0h2TO7GCgA6J2HTfstjxZVHWdSP/S5ley/MZHe2Q5yeIiOHS6Q7PPb+l54P/0fQ/2WCuZZmGONvCfMtnhrtxbCcI5Mle13YNX2SXHVc+5Fku+M7euJ7THpvxHXwvHYnxmWmKTWZ41KDjLo74j7hn2mCeZfob06FOihbPNBAVYAA8k8kRAV2Ct8SZG2oxGIO7wXrHXSw3EAlyMYNMZMwB4Xn9wy0uC2zxlrxviFrolAoDljh2I06yMPTZMs/b4DZ/+qbVnlLpHf5xTFMeY6ZJEU34MnHexfI92zfETIojQqaND5eTLJpc1zIo5y637Ykm/B+zhyeH8IQh0v1nrkATPjTorwDQAyLUuBzoMXzQDobniXwTPTGtQZPl0kLAYM8gPFLJZZcmzB6DmyJz/3JCXd8Jro40eY5D891v8i3avThsCuTKwuDkk2EMnrIxpP7wqBGaMMA2fZfhenIowIO+YdKHXR5zmUnSYW6CAKGeOFdO3OtRk21TZ8WZJIYOkdiALU3JbS4tdFjDg0q2HHXoOHyQfNMGg/iBRxLATFcAuBgHx8fPvTfpZJRHR6xErMRkUwAkGn6DOYEp22zHtsTXMkdKmIvnXM9FPzt5QlNAzN3VMaQmD1xO0wsLBZqiyQcfQbrQJ/CAJA9OoePivZNWdNbOGzABRtN2fWLOXpNNwkhC1NHySIpYf43IDUyTtuSyfhMG1AiGTQ5Ymnahmnbgi1PY+HRmMiEOlyYwhen6/uVTPQYBDOgjek3gagxZj5aHL3CFlug95YApaE9rp0o85kFTGobZf9EnBnZ7x9CggaCTaQttr8mkA3U0hHKvLzVBvm2jr6kwE5gqKIIeeXyTZRt07O7yog9eHRx88+hIn2W6/U81aQMuHX/sNdm0Tuf2uw3lZlk00JenLAi3WPi7kLdsKFqhGLoXLfSQ3LXBUUnPIFXVe8rGUJuDQ4xo8q4UA60RQp+ZgyawXHv+8NJExyEvUjrHRiV0VLps0oudwi8DIyXKwQjdhEGACu9terYda3gOPmBiNLsjm5Byjz6wO/kJTTMcI2mm2PBYIwOKbUIJ2e3sDvSaByJ0gPL5zFav0/lH1cTnTotf3ranNGsoDBO9/+X3N32Q2fIYqafndwQpUftDDd6k86Q0bp7nBGQQISaGOFrqQZebwWBTuhdIm9na5wD2y7a7/T3kUzhki7uT4lR2hJFS7Bl103dg0AaTGpiWOC8Le8qE+cQP+A46euo4rpAIchd8EnpRp1U4EPC6TJolKBHXkQ4EMDHpG4d5gdxoD1tt0Ce3W0nJpQAovB0E68yWlCExjIn18dbEW6DoEA917gLmHiMR9KTKwmAx+p7OCYT5hZvQ5yswCzQQST9zSU6pKfDFEdwNHJCWXxkJHgTWZo48HQBLRQYYXfV9ORM2gjKPjip7eM2SXA7GH5gpCL5NMQ46TxaeWiD4nj+0xSaMMRWBccxAml3YQnA/3nJpMAUfOAwvwNpZNCriCDeUUTAw4D76IY4Yy4or1AIOGHQezktAIBtXmECSO5hzT9gTAz2UskkeEDmcUkiltLpi7MEh0hhC4A1GFsALaHipBc6CMVALMEu+qB7UdcNx6IP6h5cdF/Mk3OvOUcT4WG5/7wR8Ih9c5V9OiWN8oGRJBwJbGmdAi5Pb3SkLSKchdE7n2LlgDzhVpix1wqSzIdir75GI2qh9T8ChA9OkzM6c6DoBfNnBEWz0wqST7b0WiBpFH5cv9Mjok6wYzBIsBS3u0LYUTCrZMWGk4XeSFrQCMjbSkkvHvmMgGF+wq9M7Eg7j6NMcXkbMM0kcqe+G5bu+NF4+5sNz5VKKeAieE5kxeghzJyjRMNJZe+g4ydIwSc6wEIAHl9Yme92NB+kb2PCe9HoBZtOhEy5n58xnltxmY9JMyhZ4WAxchjd9IXTQJPimvrHDtFtssNMG3qQXDPQfdZ18qB6dAKjCpWeeJxmPaheIj+6O5dCxH7sNBfzWpWdgNMEObWAo2tBNh9Rp56jhL/DzSVu1scZMG1CdcrrM7GJwk6gahIUetIk/07DleY9unhPZYPzi4Reohjzf0w2bYUm710RVzqSHBDfBbLU5wpSATElXkoJqITgDgfFEvSpod9gdwWfgJnqCBsGQ0SG0NLjMhvYX8wxagS9E9Rwpk6Jw++UbaLdXMPCpweyGNGtn4wMHFHQGz0BGqIzUJXY2iI+pDkMHbrgt+/aCRMiV6BO4QiyOkoEkMejHT4QuAvxeC0J+s4+Pb26VR1e7C1LkCeVuWkLvCjYHP3qSDck/FyMCe+z2dXDg4gW7/5nQb/Ck+88YFMOYw4NtYHs6q9u3m+SHBoM4ADPkebI6RvcUht+wRAmoziWAKoNe6scBlk/hrT+wlAz6QSio7inbIs/BHdQpgXshTDuGBuwhlCbV53DEdL3gkk1xdiuk4Qh7Q8O33hTDF2D+Optq0e+DKcYMmH2+tEQxlb5hNsFL4C+PAhjZU6rV0neQEQtQYEZBoYyKbeEMXHIGMDAi33GRGFJt/bok4BhHOHnncl2IgJkIe84+HvpiCscHA+qJ4SW/gELnflFAUqygKxxvGREYhvRKz64HRAiCMsihkJBSrTt4XdLPMKl6Fo0TnC9pf8CqlBFiOmdyX0Xloa//zokkOJ0iZ0VHWYWfbJqtU4zPCjzpT14VmqGolESu9TK0fOCBnyo8msa9j4Q59aQ7ZFpSwmTqRPAShIJC7/OhXERa1iDf4EH0BiLvUJ8pzofCsFvmgWISNmz+SO92zaUj+EWYLqNL7prSziIwdA2vF55Ag4qM0oXT4esOBpli4GHKDHrNHkTB4GgfQYj/CqeIYp6XDuC3XiE6yIfdasLA8/rQUJ6uYQwYmyL+3vZgStpQfqlLK0MyRK5NrEXPSyFXUZ5cPpZ+E8PNrsrvSYns5TJhQQZVm0yKJP1BBpTEwRsoI+gmuGvDJos8WuKq+dF2XWQfvLr0Qv7eZxv491LwYJKYrFDV9QScaw9CVsyM5VqDDClMuTXIc5p08toUmZezuScqYgX9ulLoMz0RNXh7PZE1eXu+20V9IspkIqt6mRNmUsC4ga6UYSuMg82MPpNZJAAiuXGJbX3E+RRsvTID4juz5vrL5XIEGyY65GZ2OBxOIINiinBccq9sGbcIHQr326GKh2elTisTIk6+lL5yfYMyEv0QnCEy9QdBOaKMoK8mKL0uDFEvGDDFkki/Be7HsAUWBAPes3C+BdEbeFcwo4wNEklw8F3BN62Awi5ScG8PDbRlS01Af5ip/fM4zrqsD37uFVjtrLjU630ehibyqGoaeQzyxIJHUnwJwCjvYPdjNLCXZ5N6PT8z41M//kqbLM3fL1mq/5U2/0BDn80t+KJtmsfCIJLR6TJVcC0sWm7qImAIdWA6ghHOmhJdEdmirgiDCf/fEmm/c+SIN3yZivHamAyOiCX9GvCcrKgAd9sTCZNzxoJqt5JD3jcZYB4K7rr8EbSArPjQyRhcXJgnymoYZ/PFiFUHvtw5vy/LwMn0FYJ1cgt8WppqHb5A+IRd/sii2neUKO7yR+g7vB3h87X5I8v1pKvVT1YJTbyxg8CT0uTDHRgUkoNikNYdAyUdGVpFswdpMHjXjvANL/kj+D2+PfRt4CUKK9vlj+B8eIPvsU3XFqsuna9LqW1TRD1d/simZSS7PxuUXmDkAHf5IxsdtynTAKMiF3kw8QCncT0LIRxeS8T6XRhGuTRrUPwOMhmIdOwlf8SgtdjAwYA1lqqke8YWq1rs0lUHpANhtM/5I4ciGZHz8sjfEpmpQKqSy3qxj36KBdSzKFIh5+tKiswQMZkwOjJ75fmM5KA7LgRDAB4gb4wuumSyzJ9LeadebghMZpD6v+SGMM+MVgK6zCo6AFeP9RLvriMWhKkstt0uULliVcHt5cWgcGiiMDsYN9Hiw+enILlLFoHng9Y57pJFMFAy8dIli6j6iT1YmkA4TquRG0ss4woPxSTnCKrDcaUNgaQGIsndpYYwSYFYCIF1YYI5PDI41mAdhA5hkVXp0j4escIgiqWlLKGyu8U/n1xJ6mrnDvgwKu2iKi2Qi9QQ8yyxSgyxZJI5IUYy19sd1woQ4IjpmOuA5h/imq6LehW/hoeibnqVisXuNXbxbegzrTYdj6FkpOJFHCOSFOi/2cs/z/mo5uvyRf+kzcv/86tfbfnp3XRUeyf+COXfu7o8/7tx/quo+BsluLhpbGXBIQP/3+WO2nGW9czBdoEho22Kfoe+EviQWKNbfIYEGYMDfK5JSU3WWwz1mNDFF25CxEwZXXC0+dzATfbvv0/pW7TbJsTKt90L2v0ekE7yTi9rI9eZAgdKY5gHAL8N9lpgRsTywU381OXFoMGMQWVWoLuUCIfX4/l6pvOfHI+ZjmPtoLZu+gsn3Hput88k0P9Jkz1v6jdny82d62+nxxaWhSJPj7amCL9B5H7ZIM/GhCk9pwTgDwz3FHieZQ0YxafS/ZRqN6ks6+sd+ld0ejNoYcuL7esbEJ7duTyOEBXHt4gl8JVsTyiWX4bdlRzv4kZYcJEHOu+e8WmrkDFjlXPiIz7oxGb85nhRHCEaEF01f5k+Qtgu283a9L0jly56m2/kElErJBo+JuEfaczf4Fhv/STatl9jXT7m+SrnU1C7NGt49ZbEtr+DbpHRrpiCm46TRRILpU9XV5sEF/ui3xzGTd/kdttPuvLiDN4JCxlq4dtIpaEBPN292RaHitnJxW26o8O8ul8EBtS+7KrSAEpbzQFr7PjWllzGfpnupb8XZBFvnb2Hl5HlzRxvEbTFDoN9rrRvvF8lNuSaRY+54QcOTp+fk5CdW2PSnjUKiDSp0CT6MJK3hJlJAq+PPtTr6Zwuxxs41sCGwjW3Z+XYJ76iOr5tEfIbkStkwrxc4HJ1OeVchK66oW/Fps+30XRRQ6pc7s6oxjcOfK42WL5V7M0Jdrs4cRgpF+dSj4DCBhko0gql0ct7IJZiw8wDHGVzuLhMe2lMWtf3yLH123yRCFZav+nlTsh7Pgz3bRtHNne3lizM6N1YDrk95/lc2gRsvgcmwtB4C1PRqg3H7+bsvJBhMLkv7ulU2DhsV4+Ssj4c8fV1GUqPeP91nLrO3jBOfryLg2sV0e3cRbgqN0QIp+R1zM+K19GxzDgEzvd8T6pjd2DutGHRkX/+Fkcm35qJGMaAvLMb9XtOmj+9t30c+KP8erN3W9OCuLUmlp1Z9bLqaLd7NWUg/jLoV7x9E8f53jzPcGM/YFds8/QWdxXO8Y1tuZvstrvlUL526Rev39yE+46z9a+AZqj+JpT1rhY8gjAForUo4wSIOHuwJABdYFxFk2fOnj0mOoGiLBz37EHACQzV/ahPHz+dxGgOIa2NFcflgSaG6+oardkQdFvz1f3wLxwFnACRxVS0c/CWroLOk3odqR9Fi0/l9zpIeBrsEB+0S88o2l/R1zrdKrZ/8bhpa2qsA0nXXBXVLis+1xnL5sCjvFipb0Wli0XK76RoFhStW/oxzFytq97WCPnJw5VPexy3xO+Vrp05Oh+Y4aJafhZGcOg+ALFbRU+llCoq06QOk6h+DxMO1zCBd/i9YM8eABR/U93y/SzTPYCpsUiBEPY/wv968BT0s+UcWvI3F1yJU29zCD1+m8DMkRgg7E7NqeJLIty9HZC9iKBUiBp60O42XY7+qW6KY1iUuuqtj2Dw/COtivzI82axfuxP0WTNVLGU/iL9v8BH6orkT7v7IyiyZIKqSsqz6m4MpNiW8V5TzelR+p+IvN41xSsjAEfe0EWue7rDI1IZdLlD/zWwPDryRPqjHQMsNzdFGf19UpXl1SAqk7L+tI81QrxOf/Nw+soIDZ8vS98tNwXQhxX+tmwnJENNlGd7NoE+SV/Rh+fzvNMoEENNBZfGMKhJNRlXV9jPAlEoXB1qvS3jpTQfOgztxzEq7ykpHQr4k6f7Q1OHRZ59h6e8TOP3bDKjN9envb1UYGroni6TfQtxOG01BVG3tOma+qj6XkzY7xTAb7fGvgTx9ymqU1U6VQNXLU2eI9bIQ40XTN1i1LxKoyz9LZySiZqYdCj9RRRpoBbjJ6lxtS6ajIDou6volvgS3x59RmmzZB67xekCsp+Cik6iCG+i10yNY2msDNriJOL48RNj9/Sa6TSQbCrqVBGTtBtPZ+C1iwvLs8UoUrtErJUn+FdZVM2zGRs9QKqrpGaO2wiKwq+cq6hHUKDu0l065YDNZfARoPb6d103+gyB2hmZe3l2S0z4ik8mArVCRWWqeXwmcFo13ZVp16tHx0G3pBfCvKiOYcXLLIq59qTeODDHI1VIm/hq2smqWabGMS9hRwhCmsO2cciy4noXkdVo3137Ghyrf1llHOdj8rY2Df2JiiY8i96qKmYS+M6wzunvAeE9xK2oEvq3XMHrVSOm+UfxzkNEoZqVjRIWI54KyYevl/F91HC9XokavK6LOEUg+cHp8qR8xQkmLgsvyi/9res++0fAxYUBh6JccajheCR6XSclHN/teNxoXm5TI37x+CSj+p9i510WQX2VZfa9Kij/oovX4aJM+kdz07tq4KLi+DGcNERLqKtDmjd1SC66VtdBidkq5oxHuzt+6Nw08CPw9WkrS/uspyMFmen5XaS3+i6hfQStODXKy8uXENgyqhqRPJlcTHj2IORDqNN3PS8hM9Upp601dRMqmHYJYIUbsYQlr/GfY7Qix9JVIHETHouErzeo4pltOuVBLCImCo9flNrTjfd5SDMo+WLKK5ubY1CDVrqjuHYdbvlgZgzoTlZ9JpuMId3b0TVX2MewlL6sxtHbRTDzYqvded/P9/K8IUA1Xud4D6qsiunNvDo7luY7CNwS+nkMrd3SJE8RLA9X04zxO2wy0xKM4cHoNLqd3jEchdKfG6aeYXoao599n8VuxX7/3NXjc7XEGJB6h81c2zgK9cD2w9kKYgQPUKeYNksnWhl6ZCflmQOePxrb0oQ7faxv96TP3fhwJvcoPz196egkTsK3p71s18q6t0hVrsSZG/UIkrSD/FjkT4zg3O1Uk3B3lg1n9q7iu2f4YjY/3+LIi9nracmfKY03SFRKV6thEQjdVYDXp0ZmWuEh0Yfn45Vpz/PlLcwZ6JIJfwZz5j56AUp3i6ZPwc01NVD7xZZntJtz+QGdAouz9HLXeOsEV3odxUloebomFIXd70DPHeLTtj0jtMIIT2CJ8KLdrK3wI2eP7jhsFz9pPm6gglPtq29vQdILuOJwXrYjqHo5N7yfQBUe4gLbmBY/NTvEkc2rRCZqxM6Rr9cDVW6HnZlYiOKYQ1dGzVOTOFOJToJp31IyhXTkx6LSu3YZHZff4nuNQVnIOKpVSfKZftk1ktiaJkpA6d2WGBXLD1qxhn8pUegu+TSv03h1PHDAKVvBKXkEd3equd795teof0fN6j0lzJ8a5SlsCl1DxXDPXMp5FB5RIo8q1QfMVabPfUDFs9Oiw0871dLfPFl/4jvk5DuPjj+gWG6/4MeE4KEvWZ0lfn44xr5gmyuGYF5C67kPEKopSpIf/oLpQdClmpTfcJcbX/qK9cwgIa2rgfqI64rYPWQ5p8vgrt/TKclZiF3H4Phxy5MEYa6ibs0SuKqJfEVBtSoh2mZ8rYnsIa7MQneQo7hJPyLtG0kfA6/yBVFX8wbH8e5VUZgfkA8gV1b6P+xsPoY/rR7nZt+eAF9Yad1Bn5SomRvvr7Gfn249fZ6luvRM9qj3TkcG6Vzm2n2eZu2ZS6CPgCZVURanZklxnul2LDjFvfWf9s8LZMweCU5WhyW+vlNW5TV3T4k+qcGWYzTt9f+uQSu+4xXPY766mbwg/5ShVn/B4qZaDb9YqPgg/iSza/IO1ejt5cmrMP6TcveSemsviV6H01uwtYMOJexihkOJqn91eBxz3ZDnIXjlgM+2lefwmezwGh73JJ7YenMeAd0R+zTqqeZq32uBngKzon3ahyKh86Z0S4d2FTWJXmyB/jG1hD9zS7cK8G9VXaa5WxPu451HdrWBFX8Ip4/XzlYQasT2D3cYab6ncw+d63Yu7gJS4e7Velk3p+1qmkF1IGjmKv7zdW3matkxpCgvEOZ9az/AOwq2K6rPqEpCzScyx7GWqNClRJrK8c7NyYxhiR1ein1kM8VrCgo/xRM15Z++JlQNpbmQxCiMeq/53NyoCimkmi/xt14LpwQkBaX1JN4o3EdUpbSeo9OOzri1bJ5q6oDi8rR4+HABOyXR8jq+D/fUfsqZqleBN5nVeHXWTjIYy5r1Ju8942mSRul6iMdDtCJYSneSroj3nq0K9pwovMifxxVK93VgeU5/WQ+P+GSFLfQ9vBlX2L44gesl8dqTcNXydmEUSX855g7mqq7wTOvynIF+AWSNYyFjOA8cDdEHdvd0yEwo6dhcnWueec7wSS9p5qn5W5SEf6QxD7P0mDZakwm3UPJUU/iR/tYamt4CKXIVM5N6Nxj7RO9OwFsAigz1VmAZweBcVIdr+Jfesko3UH+ljTzntiiLqc7NzYxybzDyOM4W7UT+0XwtCqDOBmiacNX9Opr6oVq/1dSLuql4dNS7AnID0pzy6ZTCK0pxFeM+BvSAdX+BB67RZA2YxTu1kBdBbVW6PTVPud3zhm8S68jrQ5hF35Pb3GbmVxWAD16qqXVMY4MlouAVr9YYVv1hhgKpbhC8rTKKrctIPKM14TqJd2kPaQanPDvDnaMpp1DbumjhAYYsmywnpXdkK/gvDW998jU4tKILyX9/FCe9Jm4KTuWYa1AwivpyGuYJn4ofFjeo9zBTWsk/lVP+go4ZG0Fd2jaMQDbf03skXh/aKNsXVdocjvWqMzoB+1eR5ovN52oXyPRBtdyv1SdYlfHyKTEloPYNfiq0qEy1BgQqrDYBfKeKrQZOvAZe3G25BjzvWKiXMq7XgHduYdbPpUW5av/khj0qZhfzug73WbGNsmVq23WfQf1bL1S6QdtiQotTlqVrwTXRSkhpXhzTpXj1Bi6OGk7GMF4R8RQfvtcZzPiQmototVskUqJVRH7hsgpcgVwvY6vGEJs0PyFeCe+IofbOJilY9ZDxZh3+6f9lpR7yrzLcRcd06tYs3YxLN7HmdFtWlK0zpru0PiCSzzldnVytg7mPjseV9Pee57wSN+glYRlVvClW0qt7XiD0hnis1M/TcctXYplDlO3CNe2GAJRHUNcBTPOEl5QGypu1AKlCKA9XlIz3TOuaoALodIyqqP6MjiuxSxaJe5FXAnv/K4wPRcbr97W6V+yVwqDbJAEPf0vjlUE/qyh/D4+njCo6VCkcY+UHaLf8x/SLigSHdXTkShdAu+kQfV417Pi5Uc7pGlS6YVcdaOmWoTWNCfy58FA04fqxncrh0d3LskjrusjXAat4Fn3Bo7sX7+ge0DPu+lNZNyfyRv65zvgigM3rHWQEfX0g6NLd2Q5eb8X7acBTnu40V+5RgClKHOgeyQ86aZrWfC28T47mbCXF+onQNar0LsBR/F09c5ZEIw6tdMMSyhsdw6Z453mNoLXWO3ljyHVDhj+hu1u1F74Zw2sqzvUvHY0g3b2JUxcQZU+OZahftsewZLWJENxfcr230I6gySZKn1S0YjqhJD3LM/X0TmzyDet0n0fkf2s9CDoCd8p3mbigXuue8hZo4lrH5+ntds/opJkhPC0ELr4e3jsf/eK9hLuTuMTlmQXwedHL7mvxlbVrCFImiIu2aZY2WjPP10BZ9Ptb3oLellXRqryu0fA4NP+SA1d/H7dFBuUIH3IqBeQats1eh9Juv64A9O+UvAJQHLQ3mGvrQlAylmOZ9uuMlR6Pp4b2i0Nwsozr385wjUc7GEoE15qv1rmCyZXnwF5n4aKU50/ai6j1Hg+6woL38PWt9b60K4D6tJXsVvHPKm003194BSa0C20R0j1kcBx4lR4R6kfLn4pW4lHvRH0WERysBruI1lPCid1WZDhyzQczVMACN9wVWaKbTSchhQSqr2c03UA332Jcw+mBnRk23ABe7aycPV/lOteEjiNJ9ZVU0eeU8pqvVybhjlGelqdMUdhX52DmvAmPaQ7lUmu3bCNwFwN3Kikg0+3cjkCWEWLkcMeb+LD8cNLeJlGOOs2TU9wU1QodrHiaK9ZX53s+Y1inXNwLTH+ZTPTplAmRUqFMR7nCSNYlojuldzyzvoMKTv9xEwUavDCFqM/3/UfwmqLI6lB17PHl7qX5ropWtA23ePSHO7pzAUCYiGiv359uQQVDrjiqt3j6z8qq0I50TwSvFhDEv9Jm+dMgNyBR/Z1r3eR2i/AZpVpvmrhB2J5S2nJRLztSivqJuiCSqInEHeKqW981TYtc8ijqVNSz1Z4Nu8HbVZz/5suOn6j1vCxEWq0wVtBn7/ybihsrA2pdfap4fKrq9INrrXl6A1PHVVo2WiPJWwxElcvcdHILNZ1Y0SSi+pPg1xBRnheNqljBTPf8GmdXUUWePNG62kmP4H+xwX7VRTu3RmAEoLX507Bsz/HtjeE47hw39UI8pNIZHYLLzFnLXS29PXQuaP0y2uF1fPbC19WH4+XD5nFES0n80tGyQGrOKZc+sTAuT5d5EW7m5k/bM5iNXwPftF1q8AIz8B13E7gecx2aONMJfBaYPh6yHZcxavJNz/cwmaZtmI5N71kGY6ZrosnFv0y02K5je+bGtvC4SS0mcEB0Y+DptsV1PJv5G9s0fCgBtFj0ukt8Ak4Rz9jMYw7wQcUKRIvD7IAoGyzwSE2hyXWYB77aWK7dfhA9zvBBrmX7vvigAN0w0SK/gprw+YgIGfGp7cqnbHQNn9t6jaLFgi4E0Y3v257gZdt2/IBRR3zbMsUzNkYQr8m9VKLFZQYGkl06i+EwXZu6hu64sslnloeObwwgWrLFY1TdbWO7biA6YkN+AoZnfANjTJ118JLpYtRcL5DC5RiGb7mGu7HEVFGLadAyMBS543mirwgPmRlQN6AMRcccG1NqeO7GBH1D0HEYMwir+2hoAsO0xFQ7LR10zPRZr2OOaxlOwPCMiXmSzwTEsq2pEi1eAMr9uXd8cJrl+jIqF88EYAeaMoOBTEAf5NNHYyLAVqYhhsN38fkGsaPIrtJ7YEUx1hA5RnWz0eL7lo/nZUwsngk8MVcbFyzv0gihzwHAMEK+aYlRxLAEwykL0HXq0sayDAwjtVhgFfrqVo9Ri80cMELvGYyrQbMhh4FaHAOfT3x+Ho8AnaVx3FiBhxGmFvTdoV4AEt9FLWAFMDiNmdN+s+85JISbwLN9gQ6WsEzPFoMGCRCziJmHNDASPRJeWzQB3wgcEwLC7PZNCIjj46lOZDF8hu9imDC4NvVJtNm+5REndVyCeXQw0zQr0L3tUy7RI/1+Hjv8B58Gptm4rue2kHjCczGeDmTSlS8GhgVZteGq0QjJJs8w8J0bMLovm2gB1cDQwTSRFhJNmAeDaFngYl8+BdawSJwx3EywuEECTicEL4rBsME2gqcun0oKJbDMQRO+wCKDdSGPEYE1cwdPQaU5NNK9Jgt6zh422ZbHrhDtwBFff2nywf6eJN9ON5oCjxj48pSJLxdcenkK3CvZtPeUA94yibn7TY4c1Y5z0URC4vYmzfRcz3bFi2AmoUlMqFjIB57CmHpCvMyAjJsf9KQZTVBUAwE3wb8WqcNBE/jKITHEFAkGsMDAjAB6VoEZrgNtZw6aAkeo806C8BusEWYcT1lBaxmYCxGBluxpB4v5NuYEfAjp8qR+gm2iWev3HNNsQhioT6YdtI+ZzLMNehVK0ZCiDGsCmSJVj58MaQ9toibG1jWsIGAvW+q+g3M21dIebQLbZFKjwYrAHGFWrOAsJXCkSeDEK5L/LZusCVHxWj8Mn2qZgqXOXAY1RZrrYhgMTxgq+M0O8bvgRPQLsoVnHEPygGExsscYVXIeBGuCO4RKO4uaaYHxod02FhSLfMvyoa1JOM4Gz3Qcsh1kb31f6HxgC0sPo8xISwoehD8CKdzA8EkTbPqQWCksgWQkwZQYmg3UoW1JbvB8YUsvkwxbTvrgMhzwSmEpvB732ZBNg97qtLdtgr8w0xvImSPdJtJ+4GBYYMOTz7iuQyavRweWl5G9bZ03Ye0dmzin6yoUvWfDZMFOuY4nLbkVuGTbL3bS8ISyvJhABzNnD4QbEi0nrG9dEcJhEAP8K77ZQR8soePOQ+8EUtgvdhO2ARNMTGW4piu0nouxD2jGbAyD4AXXghEieLHRgKYHlssV/pAHMZFoUFsWOR4bUnzCaoCOT9MJrgIjie6DLQKLTMHGhevQSjCpEQhWX/Ydyw+cvt61iDFIB/WbMGwu6+tKxDQwKhj+i1c2KvgwM+RrDppcsgiDJhegdn9iYLZaocDLgdQ1VmBAJwxYzgpsTOmgQxBYkzmDr7fhm7W2/tyEiRfa/zLxlgODK3jq4iFZGBxpGntvwvm02OBbHXLthh/mwD23nYGWdTwH30ZTK+IC0eSTEvQHtGBsoGnYoMkXernfFFh0i0m/CXzmk1qG+WfuuQnEgr7tQgAA3WINhgLMaHoDMwtelva/3wQmJM7aYNQCyU0uZp6Et/8UlKXwg/tNmCKzb87g8TBPeD1dZAJP2fJI+V5ECmGAcI8oErFZG1E5gQh5B44/8wLhIPea8OkUTfSb0MUhV9jwQMAYfQtKrgQ6QAzswk+Svj5E3/X8gfjbHhxuv+9yOGQ5MUtmX23QvjR/4JU7xJnCkcMHmW0bfchAaEhpQ3OzQZPXKsVek+8Z9oBTKIJ0hNsPSbRZGy2YLmUHzEFIEZhDCQS7kis0DDygf6U3fmmCkvVElwwKUWXsAW/IHbgYDjxM2xwoEHy+aQ1dMtr4S2LWa0Lwg0gxkGrUlpoNugLdNvvDSKrIMKz+94MJ8OBgyjGDYFrW1w0QdVg9Ic6dy4F5QMg7+H40wYd1SSLgoBjCSLqmIx3g/mMQkyEzgsucNp6/NCEydu0+s8AwwAlC9zauiJlFE0IP8p37T2HQAlKKAbwzwYsQOHgezvApnyKP/sTB+sJZ8frsg4FHhwad9BBRuZ4IpGgHNhNNZEsHlg5N6LfRp4W4BtHQoI9ocn1zENx5NkJSRB/kGJLBl01wBgYC4cGVlmLfb4KiHKh0D4AwLH0W9mD9TXKEZLl28fUezdkgzkAT2Cnoa04PT0Dz93kTg2o6vtvXwj797pDHAZ3tCv+CHFPLtPq0fBgCZ+hPoCmgsG/wlAHVw/oK0IeXJFIHGwqXhVcYkB32yYbQbBim/6KX2xZySnhZd87uzKW6Ad38oz4c+SURB/1vCjmFy0gZFDg38FNe/Xr57AXkHFZD7YpQzPAcmb+yERpQfG6RpygGklw+Uj2YUt9tY2WTXC/WerMycoX2oujGNmnMRRN8NalAPBF9CS8cZoQMxMXkwQELeo7XnF5WUfX96mUDWZpH2f6ZBVShr58HOkb1+wrXiYzBJEVca92LMQYyedhq5hJNiyH/I7cvrjV4k5hbMEultd7DPcS4mDoLNXOF5S5gxRVrYMsMK22aaA5Vcdof1oStOO2e031m4B7qSTsLFZCDNYTjqTutZq6WXoPwj8liPHp6oa7POHNGmvSpa/5mSvINivYNBjcQqltFdEGgIVScUZo5JVTqpC3Nmeb75YVFhRc1u6J6Xwvunpqb6cuqIOsy+tRbqi/n9XO3QswUqjPOuVjt4oyiBJR/pL/plIVHIFXnRWZuT86Xv1zyGqJj/QVB5DZScaN8vSDMvQumTccKnNdnhYqjazXoV/RpzpfkKnEOg+s+BggQUSzg5ir4JQ6FT4PtIkuvslMg2SsNoLpO7+wRHKk30C5PzKEGTVmleZ3Ga2iwC5g8I1L/PCjtj00WQ/w7atbtIgH+yNhOAcdF/hEuP8hj0Fma86j6WfCKZ6flsFe7yXcCtq3b89PwP8PwD33GumzwwwMxBr/Nf7LzQvv8IP5y0//8VM92OEah7tyxMt+ZGkOLYirmOh3tzMzDT6ElUdlMHv3Q27MtnZ3LJys1zjw7PgEWH6I851l9OO12GV+BIekihwgiUGldopkG+9BaXXMChx6Ncr3VuKegqqKcvJBNLyOqa8bp7JT2EiETOGku52lauubHlqO6Pvr9vUa/pE1ZBamYrNRJ2/b1KSZ1obZ5JVwmoGSdbOVpuJlZ4wnAMkqSyRsOZ16dMwWVft3R7loFuSyKbLJnM/csTEBVeb6GalfdNa5XWVzqUa9iG09lHR3L6dnSqze0L9b1cIgTzmmv+ZNPudQs49kakdI41j3/eXZKehSOMvm6Z34UiI7rh+e/rIN4ubdQb+XHKcBzYxiVZaY7uTuKWHGIbjx5tFozr9RxJMrc7KPmoHfzABBXSogSzIrJqT7cijmYe7AqT/El0JX7+Fy0px2KH7dc+HC6q64rMJeZOpmrorKyq0xdD25NjlkzKz4Odm9FWwPcmtrtJ/LL6xTRGgfCyPIkPJLcV2EU0zagyQ0js2PFkapdWVqGil0Ks/2msQJhdD1fE3Z7CurFR3V3qjUX5ByFmd6FobEvcq9gSPFb1Oh2ym7h2lmq2qxFrXuXiQqR605c3IJNBvc6e1SXPEbQnYXT6UCdAiYqIUFV1stzxydP94dG0a950kVXzB8XV8AjKFES7aLp0q8zy7GOAC1jpUeAjifNtzvfYmDQEp5N3SE/00qNwkwbqJkZslGUo1a1Mw4RfS0/WsfPZWUyqvfJwr3Itrt9vTSGvLGBvMuplQ1RiUIHVj7NXjMNzi2GaIHxrLReZ3SLU63Ql+pYT5eP1ibzlQJDF5ctLytyASGcnpWZhn8E6TNSFtydN/vtr4ub/VGcJNV+NmYCp+LkX3yHFYfVrBbvWHqkUv14e3GkY5Tvp1d5NAK1jWGZxu+aj5gp8U65ElFjD+smWWHG6IAeoKpTLK7mrnhZ8ZquANF9e8U4eJ6E4gsSXvI84Xmc8nppVCo6EO6r4lQujSTlTnP54zGgM3e2N0vqXdJVAap7ONNbPgNGiIy+f69nDMbwWhat6iY8wbAWu3Bb0TWy7SUT9VrfkdbhriqOZz20Fqwod/yAdM5Ebg8ILz/Do0BtFk19THnm1s5xxAUcpjGctGkWHz31qM2sfHxesXnyMNi8bk2C7aJ3Hp4XHdZBJN2ygEZRAlYQALydwGkrS/hs6yAXWyB/6PWfJsH+1n/33TQW/UGcVV0Prv3DujO4qmScwcK/9C6rTALWzWmrdRzFvdvLb/RqYT7hrxSf9U/CtW1azZzMazxTo0AfTs2P6SVESkK5dllrP3vyCPbkBpCZwcQI5hWk1kUQWgRLnxKGmSFEw+tmjVokozjiqvEqrTWfFhrHUtaUmsmJo0jaN9V2KKsVBFEjZsV+T5us1Pe5zhKzZzeTzEtBjKBI/0d5I+LMI17jYFSHAMpjsrKavvETYF/TSU1tQ5jw7UmMoN4Ld8eQxO1S0XardzfMCBLliWpR/WZhoB04AT/rVx4jWDIXtQoUccMqQEWVcLL7NW+WFij5Roiny2jyql19ygJvVHxCpAI26z6nERTaBrP0HDWHU/6+NAbl4ej++KW5ACqIbOAKvE294XlyrlKjOg83z5cf2XVI10WWxWTNL22qPC6yjMdNyKf2iM90a0eQyjKkkVTcS6drwhLap3mE2wInKl4YKisneV2XYT8UxbveAO4Wo628Wp6acMvz+HCMqqUl+JNH70v0qucGdWWh5yV5JUFiWhEoLX8eRwLSybCfgqKGrJhe65+5MqdAm3QYXlKmt1D3Dr+9Iq03aNq3Z6hwyOdqppOqWgHF4VjNhfX6UOscZlAjkk2cPEI4cwOUGnHHlX6sbjg4TqGqiO/rHDOyzVukYcNDlCe6t92ogT+L6n05hqV/yrTkq/LsBChdyg3vdJGMkAqX/JMwhculwF5qoGUUsJSojoOeW7Xu8xxFpZ92dL7kZ7hrHL5rDT9hfUq9W9rmfEf9UxPR/f2HRqBb+6gXZwUS759hwhtkEMvopOzyWu4WujjS7R94JY3rH8PXXSPnMWzaQ5Phbb0bIh7HLkqe/wS22H+puxzMY9BARrhCZj35iZ7XnFJDk13XqN5uoQ9RlfwMclPx6Kh/u/tj6AtlM69gj1H5M7r8GlitypcEvq/INTLZOPoa7H2NrFZmCw74Ooy9evZABS3vhFg+NBnLfyssxksWq+ZV2tUEvAzuOc/6ynhek15jDqcx9W/HHENsUV4bvq/ytPx2sxsQ7QJ9jSBSm/WinVDlwGbuG7uGqKI8KbRWG7hGkA6L1mhkzxcXwGsIUlhhw4/ldOZ11nBd49CyUKYYK/YygurkxNMZib+TRQtL3JBvrxHUNAE35KklLCESUb1QD+Is1WX2rknvT+lC41I3E2tSruNYr42Hihuf9kGuibebizVNpdzPwb9oV6PYsnw2i4brBc8NAyUmm9fdkzOZpeRvjL5oWw4gqvanI891bTW6BegWIXTtWLiF0HxY9RZAbCvTldW9JU8bHyq+W2wK2rR8rcmxOQOcOfNFaRr7urcv3w1d+y1L89PX2z4/Xe5YNw1jDr9c+Py1z+2xc3eF2LNWXFLquLZTa/MY9cycZzLz+LHjwdeGp5vMM5kx7so/0iSNiJxr07///Q9M7y/jl/eLtWbOC24V/O1b/6LX2lcM27Ju9nfevtLtEb286Zg2jfvmT1F3feJGuGtK8SmJiIbjs1+G5/9idksMJtS2iZrBfBu8am4My2AeXW5vOEHAPN+WBd4ZtXieZThoEYON332MluX03jFN18FLg5bADnzf37i21bYANLCZvzECZrs2EfZ9izmua+N7bBp/tAQGuNTqEcI7rh+Y/qUlYMwzmI1JsxxfthiOZVnoBFAtzxUtgWGbdhtyEVYAfIeZdo+OZYFu4PZa7MBwXfpEy/WZe2905e9vx2xsiA3L99EtGi7X8AKT2AVjiLn/f/8fPyfWug=="
+
+if __name__ == "__main__":
+    main()
+    if MODE == "submit":                                      # submission.csv is closed: skip interpreter / CUDA teardown
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)

@@ -1,0 +1,19 @@
+{
+  "id": "tumis001/rsna-d96-native-cache-shard-1",
+  "title": "RSNA d96 Native Cache Shard 1",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-knee-hpo-v31-d2-report-labels"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

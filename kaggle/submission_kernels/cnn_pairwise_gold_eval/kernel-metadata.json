@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-cnn-pairwise-gold-evaluation",
+  "title": "RSNA CNN Pairwise Gold Evaluation",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-cnn-top-k-pairwise-auc-fold-0",
+    "tumis001/rsna-cnn-top-k-support-gold-cache"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

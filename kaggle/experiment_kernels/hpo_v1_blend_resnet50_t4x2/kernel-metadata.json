@@ -1,0 +1,25 @@
+{
+  "id": "tumis001/rsna-hpo-blend-resnet50-t4x2-fold0",
+  "title": "RSNA HPO Blend ResNet50 T4x2 Fold0",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": ["resnet50", "t4x2", "soft-labels", "distributed-window-inference"],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-hpo-blend-xla-source-v1",
+    "tumis001/rsna-knee-hpo-v1-blended-report-labels",
+    "stevenleehans/rsna-knee-llm-report-labels"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-cnn-top-k-support-cache-shard-0",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-1",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-2"
+  ],
+  "competition_sources": ["rsna-knee-abnormality-detection"],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

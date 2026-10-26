@@ -1,0 +1,26 @@
+{
+  "id": "tumis001/rsna-few-shot-label-calibration",
+  "title": "RSNA Few-Shot Label Calibration",
+  "code_file": "steven_v4_fewshot_calibration.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "cpu",
+    "report-labels",
+    "few-shot",
+    "gold-calibration"
+  ],
+  "dataset_sources": [
+    "stevenleehans/rsna-knee-llm-report-labels",
+    "tumis001/rsna-fewshot-candidate-label-checkpoints-v1"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-hpo-blend-fit160-preprocessing-parity-check",
+  "title": "RSNA HPO Blend Fit160 Preprocessing Parity Check",
+  "code_file": "verify_fit160_preprocess.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1"
+  ],
+  "kernel_sources": [
+    "priyanjaliml/rsna-knee-fit160-cache-gold"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "None"
+}

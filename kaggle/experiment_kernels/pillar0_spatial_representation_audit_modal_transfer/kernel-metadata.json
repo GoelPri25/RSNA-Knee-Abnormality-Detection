@@ -1,0 +1,18 @@
+{
+  "id": "tumis001/rsna-knee-pillar0-spatial-transfer",
+  "title": "RSNA Knee Pillar0 Spatial Transfer",
+  "code_file": "pillar0_spatial_transfer.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [],
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

@@ -1,0 +1,30 @@
+{
+  "id": "tumis001/rsna-steven-contrastive-tensorrt-submission",
+  "title": "RSNA Steven v4 Contrastive TensorRT Submission",
+  "code_file": "rsna-steven-contrastive-tensorrt-submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "tumis001/rsna-experiment1-baseline-source",
+    "tumis001/rsna-steven-v4-contrastive-medsiglip"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-knee-medsiglip-mil-training",
+    "tumis001/medsiglip-448-vision-onnx",
+    "tumis001/medsiglip-448-onnx-runtime-benchmark",
+    "tumis001/tensorrt-10-16-slim-runtime-bundle"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaTeslaT4"
+}

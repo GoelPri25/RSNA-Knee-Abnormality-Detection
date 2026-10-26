@@ -1,0 +1,282 @@
+"""FOLD-0 EVAL (no submission): Exp 1e (control) and the teammate's 1e retrained on label-v2 (fold 0 held out in
+training; LB 0.937), through the same Kaggle d96 inference path (decoded from train DICOMs), all 825 fold-0 studies.
+Purpose: a like-for-like fold-0 comparator for Model B2 (trained on label-v2). Derived from d96_plane_parity_fold0:
+ResNet50 d96 Raptor, SWA 21-25, centre 320 crop, 94 windows, no TTA. Scored locally with scripts/audit_phase1.py."""
+from __future__ import annotations
+
+import os
+import subprocess
+from multiprocessing import Pool
+
+
+
+import csv
+import hashlib
+import json
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import numpy as np
+import torch
+
+
+
+
+# ================================================================ d96 members
+TARGETS_D96 = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA",
+               "PF OA", "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"]
+TARGETS = TARGETS_D96
+IMG, CROP_MM, EVAL_RES, EVAL_WINDOWS = 384, 140.0, 320, 94
+SLOTS = [("Sagittal", 1, 26), ("Sagittal", 0, 22), ("Coronal", 1, 18), ("Coronal", 0, 12), ("Axial", -1, 18)]
+MAXS = sum(k for _, _, k in SLOTS)
+SLOT_OF = np.repeat(np.arange(5), [k for _, _, k in SLOTS])
+TARGETS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA",
+           "PF OA", "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"]
+
+
+
+D96_MODELS = [
+    {"name": "r50_d96_1e", "arch": "resnet50.tv_in1k", "dataset": "tumis001/rsna-d96-r50-exp1e-pertarget-fold0",
+     "file": "weights_swa21_25.pt", "sha256": "cb2382ecfc05153be1024ef54f2cd1bdb55b3cd10558edb561fc6debcb37bf85"},
+    {"name": "r50_d96_labelv2", "arch": "resnet50.tv_in1k", "dataset": "priyanjaliml/rsna-knee-labelv2-checkpoint",
+     "file": "r50_labelv2_swa21_25.pt", "sha256": "1c6006b148250edee2050acd833cc0c9e2cb697feb00084fb477da2982490c49"},
+]
+SLOT_OF_D96 = np.repeat(np.arange(5), [k for _, _, k in SLOTS])
+PLANE_OF_SLOT = np.array([0, 0, 1, 1, 2])
+
+
+def window_planes(mask):
+    """Plane (0 sagittal, 1 coronal, 2 axial) of each eval window's centre slice; same centres as windows()."""
+    valid = np.where(mask)[0]
+    if len(valid) < 3:
+        valid = np.arange(3)
+    lo, hi = int(valid.min()), int(valid.max())
+    cs = np.arange(lo + 1, hi) if hi - lo >= 2 else np.array([max(1, min((lo + hi) // 2, MAXS - 2))])
+    c = np.clip(cs[np.linspace(0, len(cs) - 1, EVAL_WINDOWS).round().astype(int)], 1, MAXS - 2)
+    return PLANE_OF_SLOT[SLOT_OF_D96[c]]
+DATA = next(p for p in (Path("/kaggle/input/competitions/rsna-knee-abnormality-detection"),
+                        Path("/kaggle/input/rsna-knee-abnormality-detection")) if p.exists())
+def dataset_dir(ref):
+    owner, slug = ref.split("/")
+    return next(p for p in (Path("/kaggle/input/datasets") / owner / slug, Path("/kaggle/input") / slug) if p.exists())
+
+
+ART = dataset_dir("tumis001/rsna-d96-r50-exp1e-pertarget-fold0")
+
+
+def read_csv(path):
+    with path.open(newline="", encoding="utf-8-sig") as stream:
+        return list(csv.DictReader(stream))
+
+
+# ---------------------------------------------------------------- d96 builder (same as the training cache)
+def header(path):
+    import pydicom
+    try:
+        h = pydicom.dcmread(path, stop_before_pixels=True)
+        iop = getattr(h, "ImageOrientationPatient", None)
+        ipp = getattr(h, "ImagePositionPatient", None)
+        if iop is not None and ipp is not None and len(iop) == 6:
+            r, c = np.array(iop[:3], float), np.array(iop[3:], float)
+            pos = float(np.dot(np.array(ipp, float), np.cross(r, c)))
+        else:
+            pos = float(getattr(h, "InstanceNumber", 0) or 0)
+        ps = getattr(h, "PixelSpacing", None)
+        return pos, path, (float(ps[0]) if ps is not None else 0.5), True
+    except Exception:
+        return 0.0, path, 0.5, False
+
+
+def pixels(path):
+    import pydicom
+    from pydicom.pixels import apply_modality_lut
+    d = pydicom.dcmread(path)
+    a = apply_modality_lut(d.pixel_array, d).astype(np.float32)
+    if str(getattr(d, "PhotometricInterpretation", "")) == "MONOCHROME1":
+        a = a.max() - a
+    return a
+
+
+def crop_resize(a, ps):
+    import cv2
+    h, w = a.shape
+    cpx = min(int(round(CROP_MM / max(ps, 1e-3))), h, w)
+    y0, x0 = (h - cpx) // 2, (w - cpx) // 2
+    return cv2.resize(a[y0:y0 + cpx, x0:x0 + cpx], (IMG, IMG), interpolation=cv2.INTER_AREA)
+
+
+def build_study(job):
+    study_id, rows = job
+    vol = np.zeros((MAXS, IMG, IMG), np.uint8)
+    idx, used, errors = 0, set(), 0
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for plane, fluid, k in SLOTS:
+            cands = [r for r in rows if r["Anatomical_Plane"] == plane and r["SeriesInstanceUID"] not in used]
+            pref = [r for r in cands if fluid in (0, 1) and int(r.get("Fluid_Sensitive", 0) or 0) == fluid]
+            row = (pref or cands or [None])[0]
+            if row is None:
+                idx += k
+                continue
+            used.add(row["SeriesInstanceUID"])
+            files = sorted((DATA / "train_series" / study_id / row["SeriesInstanceUID"]).glob("*.dcm"))
+            heads = list(pool.map(header, files))
+            ok_ps = [h[2] for h in heads if h[3]]
+            med_ps = float(np.median(ok_ps)) if ok_ps else 0.5
+            heads.sort(key=lambda h: h[0])
+            n = len(heads)
+            if n == 0:
+                idx += k
+                continue
+            lo, hi = int(n * 0.02), int(n * 0.98) - 1
+            hi = max(hi, lo)
+            picks = [int(min(p, n - 1)) for p in (np.linspace(lo, hi, k).round().astype(int) if n > 1 else [0] * k)]
+
+            def load(p):
+                try:
+                    return pixels(heads[p][1]), heads[p][2]
+                except Exception:
+                    return None, med_ps
+            got = list(pool.map(load, picks))
+            valid = [a for a, _ in got if a is not None]
+            errors += len(got) - len(valid)
+            loq, hiq = (np.percentile(np.concatenate([a.ravel() for a in valid]), [2.0, 98.0]) if valid else (0.0, 1.0))
+            for a, ps in got:
+                if a is not None:
+                    aw = np.clip((a - loq) / (hiq - loq + 1e-6), 0, 1)
+                    vol[idx] = (crop_resize(aw, ps if ps > 0 else med_ps) * 255).astype(np.uint8)
+                idx += 1
+    mask = vol.reshape(MAXS, -1).max(1) > 0
+    return study_id, vol, mask, errors
+
+
+def windows(vol, mask):
+    valid = np.where(mask)[0]
+    if len(valid) < 3:
+        valid = np.arange(3)
+    lo, hi = int(valid.min()), int(valid.max())
+    cs = np.arange(lo + 1, hi) if hi - lo >= 2 else np.array([max(1, min((lo + hi) // 2, MAXS - 2))])
+    c = np.clip(cs[np.linspace(0, len(cs) - 1, EVAL_WINDOWS).round().astype(int)], 1, MAXS - 2)
+    return np.ascontiguousarray(vol[np.stack([c - 1, c, c + 1], 1)])           # [94, 3, 384, 384]
+
+
+# ---------------------------------------------------------------- model
+def ensure_timm():
+    try:
+        import timm
+        if timm.__version__ == "1.0.29":
+            return
+    except ImportError:
+        pass
+    subprocess.run([sys.executable, "-m", "pip", "install", "--no-deps", "--no-index", "-q",
+                    str(ART / "timm-1.0.29-py3-none-any.whl")], check=True)
+
+
+
+def build_d96_model(spec, device):
+    import timm
+    import torch.nn as nn
+
+    class Raptor(nn.Module):
+        def __init__(self):
+            super().__init__()
+            size = {"img_size": EVAL_RES} if spec["arch"].startswith("coatnet") else {}
+            self.backbone = timm.create_model(spec["arch"], pretrained=False, num_classes=0, **size)
+            d = self.backbone.num_features
+            self.norm = nn.LayerNorm(d)
+            self.att = nn.Sequential(nn.Linear(d, 256), nn.Tanh(), nn.Dropout(0.2), nn.Linear(256, 12))
+            self.clsW = nn.Parameter(torch.zeros(12, d))
+            self.clsb = nn.Parameter(torch.zeros(12))
+
+        def forward(self, x, b, plane=None):
+            f = self.backbone(x).view(b, x.shape[0] // b, -1)
+            h = self.norm(f)
+            a = torch.softmax(self.att(h).float(), dim=1).to(h.dtype)
+            return (torch.einsum("bkn,bkf->bnf", a, h) * self.clsW).sum(-1) + self.clsb
+
+    class RaptorPlane(Raptor):
+        """Exp 2c head (scripts/coatnet_d96_runner.py RaptorPlane): per-plane attention pool + classifier, logits summed.
+        auxW / auxb are the training-only plane heads, kept so the state dict loads strictly."""
+        def __init__(self):
+            super().__init__()
+            d = self.backbone.num_features
+            del self.att, self.clsW
+            self.patt = nn.ModuleList([nn.Sequential(nn.Linear(d, 256), nn.Tanh(), nn.Dropout(0.2), nn.Linear(256, 12))
+                                       for _ in range(3)])
+            self.pW = nn.Parameter(torch.zeros(3, 12, d)); self.auxW = nn.Parameter(torch.zeros(3, 12, d))
+            self.auxb = nn.Parameter(torch.zeros(3, 12))
+
+        def forward(self, x, b, plane=None):
+            f = self.backbone(x).view(b, x.shape[0] // b, -1)
+            h = self.norm(f)
+            main = 0
+            for p in range(3):
+                m = (plane == p)
+                s = self.patt[p](h).float().masked_fill(~m[..., None], -1e4)
+                a = (torch.softmax(s, dim=1) * m[..., None]).to(h.dtype)
+                main = main + (torch.einsum("bkn,bkf->bnf", a, h) * self.pW[p]).sum(-1)
+            return main + self.clsb
+
+    path = dataset_dir(spec["dataset"]) / spec["file"]
+    if hashlib.sha256(path.read_bytes()).hexdigest() != spec["sha256"]:
+        raise ValueError(f"Weights hash mismatch: {spec['name']}")
+    model = RaptorPlane() if spec.get("plane") else Raptor()
+    model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True), strict=True)
+    return model.to(device).eval().to(memory_format=torch.channels_last)
+
+
+def d96_predict(ids):
+    ensure_timm()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    models = [(s, build_d96_model(s, device)) for s in D96_MODELS]
+    mean_t = torch.tensor([0.485, 0.456, 0.406], device=device).view(1, 3, 1, 1)
+    std_t = torch.tensor([0.229, 0.224, 0.225], device=device).view(1, 3, 1, 1)
+    by_study = {}
+    for row in read_csv(DATA / "train_series.csv"):
+        by_study.setdefault(row["StudyInstanceUID"], []).append(row)
+    out = {s["name"]: {} for s in D96_MODELS}
+    stats = {"empty_studies": 0, "decode_errors": 0, "fp32_fallbacks": 0}
+    use_amp = device.type == "cuda"
+    with Pool(4) as procs, torch.inference_mode():
+        for n, (sid, vol, mask, errors) in enumerate(
+                procs.imap(build_study, [(s, by_study.get(s, [])) for s in ids]), 1):
+            stats["decode_errors"] += errors
+            if not mask.any():
+                stats["empty_studies"] += 1
+                continue                                     # member skipped for this study
+            x = torch.from_numpy(windows(vol, mask)).to(device).float().div_(255.0)
+            lo = (IMG - EVAL_RES) // 2
+            x = ((x[..., lo:lo + EVAL_RES, lo:lo + EVAL_RES] - mean_t) / std_t).contiguous(memory_format=torch.channels_last)
+            plane = torch.from_numpy(window_planes(mask)).to(device)[None]
+            for spec, model in models:
+                with torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
+                    logits = model(x, 1, plane).float()
+                if not torch.isfinite(logits).all():
+                    stats["fp32_fallbacks"] += 1
+                    logits = model(x, 1, plane).float()
+                p = logits.sigmoid()[0].cpu().numpy()
+                if p.shape != (12,) or not np.isfinite(p).all():
+                    raise ValueError(f"Invalid d96 prediction {sid} {spec['name']}")
+                out[spec["name"]][sid] = p.tolist()
+            if n % 50 == 0 or n == len(ids):
+                print(f"d96 {n}/{len(ids)} studies", flush=True)
+    return out, stats
+
+
+def main():
+    ids_path = next(p for p in (Path("/kaggle/input/datasets/tumis001/rsna-d96-fold0-ids/fold0_ids.json"),
+                                Path("/kaggle/input/rsna-d96-fold0-ids/fold0_ids.json")) if p.exists())
+    ids = json.loads(ids_path.read_text())
+    assert len(ids) == 825, len(ids)
+    t0 = time.monotonic()
+    out, stats = d96_predict(ids)
+    for spec in D96_MODELS:                               # same layout as the runner's val_swa.json
+        preds = [{"study_id": s, "probabilities": out[spec["name"]][s]} for s in ids if s in out[spec["name"]]]
+        Path(f"/kaggle/working/val_{spec['name']}.json").write_text(json.dumps(
+            {"targets_in_order": TARGETS, "note": f"{spec['name']} fold 0, Kaggle d96 path", "predictions": preds}))
+    print(json.dumps({"stats": stats, "seconds": round(time.monotonic() - t0, 1)}), flush=True)
+
+
+if __name__ == "__main__":
+    main()

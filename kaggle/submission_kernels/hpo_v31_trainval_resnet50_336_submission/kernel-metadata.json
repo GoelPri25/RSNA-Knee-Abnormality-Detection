@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-hpo-v31-trainval-resnet50-336-submission",
+  "title": "RSNA HPO v31 Trainval ResNet50 336 Submission",
+  "code_file": "submission.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "tumis001/rsna-resnet50-v31-trainval-336px-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

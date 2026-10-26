@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-d96-labelv2-fold0-eval",
+  "title": "RSNA d96 Labelv2 Fold0 Eval",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-d96-r50-exp1e-pertarget-fold0",
+    "priyanjaliml/rsna-knee-labelv2-checkpoint",
+    "tumis001/rsna-d96-fold0-ids"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

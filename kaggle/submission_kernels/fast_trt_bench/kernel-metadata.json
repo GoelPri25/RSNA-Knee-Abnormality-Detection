@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-fast-trt-bench",
+  "title": "rsna-fast-trt-bench",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "tumis001/rsna-fast-e4all-weights",
+    "tumis001/rsna-fast-eval"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

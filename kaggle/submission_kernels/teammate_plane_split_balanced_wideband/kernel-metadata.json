@@ -1,0 +1,34 @@
+{
+  "id": "priyanjaliml/rsna-hpo-plane-split-balanced-wideband-fold-0",
+  "id_no": 137028812,
+  "title": "RSNA HPO Plane Split Balanced Wideband Fold 0",
+  "code_file": "rsna-hpo-plane-split-balanced-wideband-fold-0.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu",
+    "resnet"
+  ],
+  "dataset_sources": [
+    "",
+    "tumis001/rsna-knee-hpo-v1-blended-report-labels",
+    "stevenleehans/rsna-knee-llm-report-labels"
+  ],
+  "kernel_sources": [
+    "priyanjaliml/rsna-knee-wideband-cache-gold",
+    "priyanjaliml/rsna-knee-wideband-cache-shard-0",
+    "priyanjaliml/rsna-knee-wideband-cache-shard-1",
+    "priyanjaliml/rsna-knee-wideband-cache-shard-2",
+    "priyanjaliml/rsna-knee-wideband-cache-shard-3"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:2757e0c7d1e0a9cb43da657b97e223c321a98f5014bdf64f44f2f6b083ad2b2f",
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-v4-l4copy-loc-nopatch-submission",
+  "title": "RSNA v4 l4copy loc nopatch submission",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-coatnet-d96-exp1b-fold0",
+    "tumis001/rsna-v4-l4copy-fold0",
+    "tumis001/rsna-v4-l4c-locator"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

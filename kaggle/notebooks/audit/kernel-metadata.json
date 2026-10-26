@@ -1,0 +1,16 @@
+{
+  "id": "tumis001/rsna-knee-pillar0-data-audit",
+  "title": "RSNA Knee Pillar0 Data Audit",
+  "code_file": "audit.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

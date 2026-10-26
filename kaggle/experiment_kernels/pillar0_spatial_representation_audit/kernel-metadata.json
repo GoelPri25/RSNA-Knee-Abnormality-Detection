@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-knee-pillar0-spatial-audit",
+  "title": "RSNA Knee Pillar0 Spatial Audit",
+  "code_file": "pillar0_spatial_representation_audit.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-exp6-aux-findings-extraction",
+  "title": "RSNA Exp6 Aux Findings Extraction",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [
+    "qwen-lm/qwen-3/transformers/14b-awq/1"
+  ],
+  "machine_shape": "NvidiaTeslaT4"
+}

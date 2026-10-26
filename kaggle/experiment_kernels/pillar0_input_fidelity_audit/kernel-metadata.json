@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-knee-input-fidelity-audit",
+  "title": "RSNA Knee Input Fidelity Audit",
+  "code_file": "pillar0_input_fidelity_audit.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "tumis001/report-label-extraction"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

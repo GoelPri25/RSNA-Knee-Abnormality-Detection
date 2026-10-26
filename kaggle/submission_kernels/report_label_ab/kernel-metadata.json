@@ -1,0 +1,28 @@
+{
+  "id": "tumis001/rsna-report-label-ab",
+  "title": "RSNA Report Label A-B on MedSigLIP Baseline",
+  "code_file": "report_label_ab.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [],
+  "dataset_sources": [
+    "tumis001/rsna-experiment1-baseline-source",
+    "flight0234/rsna-knee-hybrid-report-labels"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-knee-medsiglip-features-shard-0",
+    "tumis001/rsna-knee-medsiglip-features-shard-1",
+    "tumis001/rsna-knee-medsiglip-features-shard-2",
+    "tumis001/rsna-knee-medsiglip-gold-features",
+    "tumis001/report-label-extraction",
+    "tumis001/report-label-audit"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-fast-io-ab",
+  "title": "rsna-fast-io-ab",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-fast-global-weights",
+    "tumis001/rsna-fast-eval"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

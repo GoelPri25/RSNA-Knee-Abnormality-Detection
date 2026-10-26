@@ -1,0 +1,28 @@
+{
+  "id": "tumis001/rsna-hpo-v3-1-d2-resnet50-fold0",
+  "title": "RSNA HPO v3.1 D2 ResNet50 Fold0",
+  "code_file": "training.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-hpo-blend-xla-source-v1",
+    "tumis001/rsna-knee-hpo-v31-d2-report-labels",
+    "stevenleehans/rsna-knee-llm-report-labels",
+    "tumis001/rsna-cnn-topk-support-cache-shard-0-rehost",
+    "tumis001/rsna-cnn-topk-support-cache-shard-1-rehost",
+    "tumis001/rsna-cnn-topk-support-cache-shard-2-rehost"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

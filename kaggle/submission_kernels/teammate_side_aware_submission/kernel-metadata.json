@@ -1,0 +1,23 @@
+{
+  "id": "tumis001/rsna-teammate-r34-side-aware-submission",
+  "title": "RSNA Teammate R34 Side Aware Submission",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "priyanjaliml/rsna-918-side-aware-training-code",
+    "priyanjaliml/rsna-918-side-aware-scratch-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

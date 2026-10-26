@@ -1,0 +1,23 @@
+{
+  "id": "tumis001/rsna-e3-train-labelset-shard0",
+  "title": "RSNA E3 Train Labelset Shard0",
+  "code_file": "labelset.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-coatnet-d96-exp1b-fold0",
+    "tumis001/rsna-d96-cnxt-p1-pertarget-fold0",
+    "priyanjaliml/rsna-knee-labelv2-checkpoint",
+    "priyanjaliml/rsna-knee-pp4-v2-checkpoint"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

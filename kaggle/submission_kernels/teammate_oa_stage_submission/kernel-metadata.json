@@ -1,0 +1,23 @@
+{
+  "id": "tumis001/rsna-teammate-r34-oa-stage-submission",
+  "title": "RSNA Teammate R34 OA Stage Submission",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "priyanjaliml/rsna-hpo-topk-attention-sliceorder-source",
+    "priyanjaliml/rsna-r34-auc-control-oa-stage-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "tumis001/rsna-cnxs-pack",
+  "title": "rsna-cnxs-pack",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "tumis001/rsna-fast-cnxs-weights"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

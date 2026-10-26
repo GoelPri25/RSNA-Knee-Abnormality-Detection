@@ -1,0 +1,23 @@
+{
+  "id": "tumis001/rsna-exp4-threeway-score",
+  "title": "RSNA Experiment 4 Three-Way Label Source Score",
+  "code_file": "score_three_label_sources.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-exp4-report-label-comparison",
+    "tumis001/rsna-exp4-alternate-label-runs-v1",
+    "tumis001/rsna-exp4-steven-label-run-v1"
+  ],
+  "kernel_sources": [
+    "tumis001/report-label-audit"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

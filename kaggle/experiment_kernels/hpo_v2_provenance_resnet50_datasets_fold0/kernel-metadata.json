@@ -1,0 +1,29 @@
+{
+  "id": "tumis001/rsna-hpo-v2-provenance-resnet50-datasets-fold0",
+  "title": "RSNA HPO v2 Provenance ResNet50 Datasets Fold0",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-hpo-blend-xla-source-v1",
+    "tumis001/rsna-knee-hpo-v2-provenance-candidate",
+    "stevenleehans/rsna-knee-llm-report-labels"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-cnn-top-k-support-cache-shard-0",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-1",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-2"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

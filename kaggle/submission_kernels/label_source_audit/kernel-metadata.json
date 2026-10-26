@@ -1,0 +1,36 @@
+{
+  "id": "tumis001/rsna-report-label-source-audit",
+  "title": "RSNA Report Label Source Audit",
+  "code_file": "report_label_source_audit.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "cpu",
+    "label-audit",
+    "validation"
+  ],
+  "dataset_sources": [
+    "flight0234/rsna-knee-hybrid-report-labels",
+    "stevenleehans/rsna-knee-llm-report-labels",
+    "pilkwang/rsna-knee-llm-labels",
+    "lixin73/rsna-knee-llm-report-labels-sol56",
+    "yunusgmsoy/rsna-knee-llm-report-labels",
+    "yehezkielhaganta/psuedo-labeling-knee",
+    "vmohitrao/rsna-knee-report-labels",
+    "riadmohamed42/jev-knee-labels",
+    "nartaa/rsna-knee-hpo-assets",
+    "saisahanas/rsna-knee-radiologist-report-labels",
+    "laymond/rsna-knee-abnormality-qwen3-8b-weak-labels"
+  ],
+  "kernel_sources": [
+    "tumis001/report-label-audit"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

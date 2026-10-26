@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-d96-r50-v3-spatial-submission",
+  "title": "RSNA d96 R50 v3 Spatial Submission",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-d96-r50-v3-spatial-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

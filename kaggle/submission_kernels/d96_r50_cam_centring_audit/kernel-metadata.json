@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-d96-r50-cam-centring-audit",
+  "title": "RSNA d96 R50 CAM Centring Audit",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-d96-r50-exp1c-fold0",
+    "tumis001/rsna-d96-fold0-ids"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "tumis001/rsna-cnn-slice-series-reader-fold-0",
+  "title": "RSNA CNN Slice Series Reader Fold 0",
+  "code_file": "rsna-cnn-slice-series-reader-fold-0.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": ["gpu", "medical-imaging"],
+  "dataset_sources": [
+    "tumis001/rsna-cnn-slice-series-reader-source-v1",
+    "stevenleehans/rsna-knee-llm-report-labels"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-cnn-top-k-support-cache-shard-0",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-1",
+    "tumis001/rsna-cnn-top-k-support-cache-shard-2"
+  ],
+  "competition_sources": ["rsna-knee-abnormality-detection"],
+  "model_sources": [],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaTeslaT4"
+}

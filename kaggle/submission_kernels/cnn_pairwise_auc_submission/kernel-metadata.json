@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-cnn-top-k-pairwise-auc-submission",
+  "title": "RSNA CNN Top-k Pairwise AUC Submission",
+  "code_file": "rsna-cnn-pairwise-auc-submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1"
+  ],
+  "kernel_sources": [
+    "tumis001/rsna-cnn-top-k-pairwise-auc-fold-0"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

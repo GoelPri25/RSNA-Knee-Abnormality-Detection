@@ -1,0 +1,18 @@
+{
+  "id": "tumis001/rsna-r7d-pack",
+  "title": "rsna-r7d-pack",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "tumis001/rsna-fast-r7d-weights"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

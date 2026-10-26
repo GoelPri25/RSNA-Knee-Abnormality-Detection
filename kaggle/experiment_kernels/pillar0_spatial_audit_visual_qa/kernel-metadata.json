@@ -1,0 +1,16 @@
+{
+  "id": "tumis001/rsna-knee-pillar0-spatial-audit-visual-qa",
+  "title": "RSNA Knee Pillar0 Spatial Audit Visual QA",
+  "code_file": "pillar0_spatial_audit_visual_qa.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

@@ -1,0 +1,25 @@
+{
+  "id": "tumis001/rsna-lean4-b2-d96-probability-ensemble",
+  "title": "RSNA Lean4 B2 d96 Probability Ensemble",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "tumis001/rsna-hpo-v31-d2-resnet50-best",
+    "tumis001/rsna-coatnet-d96-exp1b-fold0",
+    "tumis001/rsna-d96-r50-exp1e-pertarget-fold0",
+    "tumis001/rsna-d96-r50-exp2c-plane-fold0",
+    "tumis001/rsna-d96n-swin3d-b2-fold0"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

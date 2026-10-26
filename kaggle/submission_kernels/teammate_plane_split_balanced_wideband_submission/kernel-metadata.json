@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-plane-split-wideband-submission",
+  "title": "RSNA Plane Split Wideband Submission",
+  "code_file": "rsna-hpo-plane-split-balanced-wideband-submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/tumis-rsna-plane-split-wb-1005"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

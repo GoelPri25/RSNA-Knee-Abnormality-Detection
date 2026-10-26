@@ -1,0 +1,26 @@
+{
+  "id": "tumis001/rsna-kd-gap-xai",
+  "title": "rsna-kd-gap-xai",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-coatnet-d96-exp1b-fold0",
+    "tumis001/rsna-d96-fold0-ids",
+    "tumis001/rsna-v4-l4copy-fold0",
+    "tumis001/rsna-pubkd-r-ra-fold0",
+    "tumis001/rsna-pubkd-kd-b-fold0",
+    "tumis001/rsna-pubkd-kd-e4-fold0",
+    "nartaa/rsna-knee-publication-swa-weights-20261007"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

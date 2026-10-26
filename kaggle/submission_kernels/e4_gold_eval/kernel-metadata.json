@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-e4-gold-eval",
+  "title": "rsna-e4-gold-eval",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-coatnet-d96-exp1b-fold0",
+    "tumis001/rsna-pubkd-kd-e4-fold0",
+    "tumis001/rsna-fast-eval"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

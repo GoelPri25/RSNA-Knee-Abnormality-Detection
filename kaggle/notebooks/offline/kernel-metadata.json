@@ -1,0 +1,24 @@
+{
+  "id": "tumis001/pillar0-offline-load-test",
+  "id_no": 134883598,
+  "title": "pillar0-offline-load-test",
+  "code_file": "pillar0-offline-load-test.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "tumis001/pillar0-breastmri-offline-bundle",
+    "tumis001/pillar0-offline-load-test"
+  ],
+  "competition_sources": [],
+  "model_sources": [],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaTeslaT4"
+}

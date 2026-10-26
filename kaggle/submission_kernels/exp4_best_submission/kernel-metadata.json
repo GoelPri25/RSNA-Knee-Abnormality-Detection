@@ -1,0 +1,24 @@
+{
+  "id": "tumis001/rsna-experiment-4-best-label-source-submission",
+  "title": "RSNA Experiment 4 Best Label Source Submission",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [
+    "tumis001/rsna-experiment1-baseline-source",
+    "tumis001/rsna-exp4-report-label-comparison",
+    "tumis001/rsna-exp4-alternate-label-runs-v1",
+    "tumis001/rsna-exp4-steven-label-run-v1"
+  ],
+  "competition_sources": ["rsna-knee-abnormality-detection"],
+  "kernel_sources": [
+    "tumis001/rsna-knee-medsiglip-mil-training",
+    "tumis001/medsiglip-448-offline-bundle"
+  ],
+  "model_sources": []
+}

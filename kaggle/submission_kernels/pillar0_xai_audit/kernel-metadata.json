@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-pillar0-reader-xai-audit",
+  "title": "RSNA Pillar0 Reader XAI Audit",
+  "code_file": "pillar0_xai_audit.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-pillar0-spatial-token-cache-v1",
+    "tumis001/rsna-pillar0-target-query-reader-v1",
+    "stevenleehans/rsna-knee-llm-report-labels",
+    "tumis001/rsna-cnn-topk-support-source-v1"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

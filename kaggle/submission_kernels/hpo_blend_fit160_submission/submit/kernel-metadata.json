@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-hpo-blend-fit160-best-checkpoint-submission",
+  "title": "RSNA HPO Blend Fit160 Best Checkpoint Submission",
+  "code_file": "rsna-hpo-blend-fit160-submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "tumis001/rsna-hpo-blend-fit160-best-epoch15"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

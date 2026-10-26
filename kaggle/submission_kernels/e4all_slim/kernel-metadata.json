@@ -1,0 +1,15 @@
+{
+  "id": "tumis001/rsna-e4all-slim",
+  "title": "rsna-e4all-slim",
+  "code_file": "convert.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": ["tumis001/rsna-pubkd-e4all", "tumis001/rsna-fast-global-weights"],
+  "kernel_sources": [],
+  "competition_sources": [],
+  "model_sources": []
+}

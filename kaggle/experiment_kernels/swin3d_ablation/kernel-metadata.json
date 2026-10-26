@@ -1,0 +1,18 @@
+{
+  "id": "tumis001/rsna-swin3d-b3-ablation",
+  "title": "RSNA Swin3D B3 Ablation",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["tumis001/rsna-swin3d-ablation-code"],
+  "kernel_sources": ["tumis001/rsna-d96-native-cache-shard-0", "tumis001/rsna-d96-native-cache-shard-1",
+                     "tumis001/rsna-d96-native-cache-shard-2", "tumis001/rsna-d96-native-cache-shard-3",
+                     "tumis001/rsna-d96-native-cache-shard-4", "tumis001/rsna-d96-native-cache-shard-5"],
+  "competition_sources": [],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

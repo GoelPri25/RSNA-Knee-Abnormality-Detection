@@ -1,0 +1,20 @@
+{
+  "id": "tumis001/rsna-cnn-fullband224-cache-shard-2",
+  "title": "RSNA CNN Fullband224 Cache Shard 2",
+  "code_file": "cache.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-cnn-topk-support-source-v1",
+    "tumis001/rsna-knee-hpo-v31-d2-report-labels"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}

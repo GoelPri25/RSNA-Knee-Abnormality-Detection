@@ -1,0 +1,21 @@
+{
+  "id": "tumis001/rsna-fast-cnxs-trt-eval",
+  "title": "rsna-fast-cnxs-trt-eval",
+  "code_file": "submission.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "tumis001/rsna-fast-cnxs-trt",
+    "tumis001/rsna-fast-eval"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

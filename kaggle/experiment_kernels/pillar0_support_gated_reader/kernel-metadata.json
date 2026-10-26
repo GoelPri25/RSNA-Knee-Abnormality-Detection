@@ -1,0 +1,22 @@
+{
+  "id": "tumis001/rsna-knee-pillar-0-spatial-token-cache",
+  "title": "RSNA Knee Pillar-0 Spatial Token Cache",
+  "code_file": "pillar0_support_gated_reader.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [],
+  "dataset_sources": [
+    "tumis001/rsna-pillar0-spatial-token-cache-v1"
+  ],
+  "kernel_sources": [
+    "tumis001/pillar0-breastmri-offline-bundle"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ],
+  "model_sources": []
+}
