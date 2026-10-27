@@ -67,23 +67,6 @@ Notable measured negatives (kept in the ledger on purpose): online distillation 
 on the leaderboard; 48 instead of 16 training windows gained only +0.001 at 3x compute; using one crop per finding
 instead of four cost about −0.003.
 
-## Repository layout
-
-```
-src/rsna_knee/            installable package: DICOM geometry, volume building, audit tools, readers
-scripts/                  training runners, label builders, audits, analysis, cloud launchers (see scripts/README.md)
-  online_kd/              distillation, ranking loss, backbone patches, scoring, inference core, Modal / Colab lanes
-  meluxina/               Slurm jobs and environment files for the HPC runs
-  fm_teacher/             external-data teacher experiments
-kaggle/
-  submission_kernels/     Kaggle submission and evaluation kernels, one folder per kernel (see kaggle/README.md)
-  experiment_kernels/     Kaggle training / data-preparation kernels
-  notebooks/              dataset audit and milestone notebooks
-configs/                  experiment configuration files
-tests/                    unit tests (synthetic DICOMs)
-docs/                     experiment ledger, designs, reviews, analyses, handoffs, figures (see docs/README.md)
-reports/                  small summary outputs of early input audits
-```
 
 ## Getting started
 
